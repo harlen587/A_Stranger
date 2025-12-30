@@ -1,0 +1,748 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>幹話台股小工具</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Chart.js Date Adapter -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+    <!-- FontAwesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; }
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3b82f6;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* 浮水印字體樣式 */
+        .watermark-font {
+            font-family: 'Arial', sans-serif;
+			font-weight: bold;
+			position: absolute;
+			top: 50%; /* 定位到垂直中心 */
+			left: 50%; /* 定位到水平中心 */
+			transform: translate(-50%, -50%) rotate(-20deg); /* 旋轉並居中 */
+			font-size: 60px;
+			color: #ccc;
+			opacity: 0.3;
+        }
+
+        /* 隱藏捲軸 */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+    </style>
+</head>
+<body class="bg-gray-100 text-gray-800 min-h-screen flex flex-col">
+
+    <!-- Header & Navigation -->
+    <header class="bg-white shadow-sm sticky top-0 z-30">
+        <div class="max-w-6xl mx-auto px-4">
+            <div class="flex items-center justify-between py-3">
+                <h1 class="text-xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid fa-chart-line text-blue-600"></i>
+                    幹話台股小工具
+                </h1>
+            </div>
+            
+            <!-- Tabs -->
+            <div class="flex space-x-6 border-b border-gray-200 mt-2">
+                <button onclick="switchTab('lahos')" id="tab-lahos" class="pb-3 px-1 border-b-2 font-medium text-sm transition-colors border-blue-600 text-blue-600">
+                    濃活五線譜
+                </button>
+                <button onclick="switchTab('compare')" id="tab-compare" class="pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
+                    自選‧股績效比較
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-grow container max-w-6xl mx-auto px-4 py-6">
+
+        <!-- ERROR MESSAGE (Global) -->
+        <div id="globalError" class="hidden bg-red-50 text-red-600 p-4 rounded-lg border border-red-100 flex items-center gap-2 mb-4">
+            <i class="fa-solid fa-circle-exclamation"></i>
+            <span id="globalErrorMsg">發生錯誤</span>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- View 1: 樂活五線譜 (Lahos) -->
+        <!-- ========================================== -->
+        <div id="view-lahos" class="space-y-6">
+            <!-- Lahos Controls -->
+            <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
+                <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-end">
+                    <div class="w-full md:w-auto flex-grow max-w-md">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">查詢個股</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="lahosInput" placeholder="輸入代號 (如 2330)" 
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                                value="2330" onkeydown="if(event.key==='Enter') fetchLahosData()">
+                            <button onclick="fetchLahosData()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                                分析
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Lahos Period Selector -->
+                    <div class="flex bg-gray-100 p-1 rounded-lg">
+                        <button onclick="setLahosPeriod('3.5')" id="btn-lahos-3.5" class="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition">3.5年</button>
+                        <button onclick="setLahosPeriod('5')" id="btn-lahos-5" class="px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition">5年</button>
+                        <button onclick="setLahosPeriod('10')" id="btn-lahos-10" class="px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition">10年</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Lahos Loading -->
+            <div id="lahosLoading" class="hidden py-10 flex justify-center items-center gap-3">
+                <div class="loader"></div>
+                <span class="text-gray-500">正在計算回歸直線與標準差...</span>
+            </div>
+
+            <!-- Lahos Result -->
+            <div id="lahosResult" class="hidden space-y-6">
+                <!-- Info Cards -->
+                <div class="bg-white rounded-xl shadow-sm p-6 border-l-4" id="lahosInfoCardBorder">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <div class="flex items-center gap-2 mb-1">
+                                <span id="lahosDisplaySymbol" class="font-bold text-gray-800 bg-gray-100 px-2 py-0.5 rounded text-sm">--</span>
+                                <span class="text-sm text-gray-500">目前股價</span>
+                            </div>
+                            <h2 class="text-4xl font-bold" id="lahosCurrentPrice">--</h2>
+                            <p class="text-xs text-gray-400 mt-1" id="lahosDataDate">--</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="text-sm text-gray-500 mb-1">位階判斷</p>
+                            <span id="lahosPositionBadge" class="inline-block px-4 py-2 rounded-lg text-base font-bold bg-gray-200 text-gray-700">
+                                --
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Lahos Chart -->
+                <div class="bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                        <span class="watermark-font text-gray-500" style="font-size: 60px; opacity: 0.3;">濃活陌生人的五線譜</span>
+                    </div>
+                    <canvas id="lahosChart" class="relative z-10"></canvas>
+                </div>
+                
+                <div class="text-xs text-gray-400 text-center">
+                    <p>濃活五線譜原理：利用統計學的回歸直線作為趨勢參考，並以標準差(SD)劃分股價高低位階。</p>
+                </div>
+            </div>
+        </div>
+
+
+        <!-- ========================================== -->
+        <!-- View 2: 自選績效比較 (Compare) -->
+        <!-- ========================================== -->
+        <div id="view-compare" class="hidden space-y-6">
+            <!-- Compare Controls -->
+            <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">加入比較股票</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="compareInput" placeholder="輸入代號 (如 2330)" 
+                            class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                            onkeydown="if(event.key==='Enter') addCompareStock()">
+                        <button onclick="addCompareStock()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                            加入
+                        </button>
+                    </div>
+                    <!-- Tags -->
+                    <div id="compareTags" class="flex flex-wrap gap-2 mt-3"></div>
+                    <p id="compareEmptyHint" class="text-gray-400 text-sm italic mt-2">尚未加入任何股票，預設比較 2330 vs 1101</p>
+                </div>
+
+                <hr class="border-gray-100">
+
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <!-- Compare Period -->
+                    <div class="flex flex-wrap bg-gray-100 p-1 rounded-lg">
+                        <button onclick="setCompareRange('1mo')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="1mo">1月</button>
+                        <button onclick="setCompareRange('3mo')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="3mo">1季</button>
+                        <button onclick="setCompareRange('ytd')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="ytd">今年</button>
+                        <button onclick="setCompareRange('1y')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition" data-range="1y">1年</button>
+                        <button onclick="setCompareRange('3y')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="3y">3年</button>
+                        <button onclick="setCompareRange('5y')" class="period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="5y">5年</button>
+                    </div>
+
+                    <!-- Dividend Toggle -->
+                    <div class="flex items-center gap-3">
+                        <span class="text-sm font-medium text-gray-700">報酬計算：</span>
+                        <label class="relative inline-flex items-center cursor-pointer">
+                            <input type="checkbox" id="dividendToggle" class="sr-only peer" checked onchange="refreshCompareData()">
+                            <div class="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
+                            <span class="ml-2 text-sm font-medium text-gray-900" id="dividendLabel">含息 (總報酬)</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare Loading -->
+            <div id="compareLoading" class="hidden py-10 flex justify-center items-center gap-3">
+                <div class="loader"></div>
+                <span class="text-gray-500">正在抓取並計算報酬率...</span>
+            </div>
+
+            <!-- Compare Result -->
+            <div id="compareResult" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Chart -->
+                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
+                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                        <span class="watermark-font text-gray-500" style="font-size: 65px; opacity: 0.3;">陪你查報酬率的陌生人</span>
+                    </div>
+                    <canvas id="compareChart" class="relative z-10"></canvas>
+                </div>
+                
+                <!-- Table -->
+                <div class="lg:col-span-1 bg-white rounded-xl shadow-sm p-4">
+                    <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">績效排行</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left">
+                            <thead class="bg-gray-50 text-gray-500">
+                                <tr>
+                                    <th class="px-3 py-2 rounded-l-lg">股票</th>
+                                    <th class="px-3 py-2 text-right">現價</th>
+                                    <th class="px-3 py-2 text-right rounded-r-lg">報酬率</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rankingTableBody"></tbody>
+                        </table>
+                    </div>
+                    <div class="mt-4 text-xs text-gray-400">
+                        <p>* 含息報酬使用還原股價 (Adj Close)</p>
+                        <p>* 不含息報酬使用原始收盤價 (Close)</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        // ==========================================
+        // 共用設定與工具 (Shared Utils)
+        // ==========================================
+        const PROXIES = [
+            "https://corsproxy.io/?",
+            "https://api.allorigins.win/raw?url="
+        ];
+
+        const COLORS = [
+            '#2563eb', '#dc2626', '#16a34a', '#d97706', 
+            '#9333ea', '#0891b2', '#be185d', '#4b5563'
+        ];
+
+        // 股票名稱快取
+        let stockNamesCache = {}; 
+
+        async function fetchWithProxy(url) {
+            for (let proxy of PROXIES) {
+                try {
+                    const res = await fetch(proxy + encodeURIComponent(url));
+                    if (res.ok) return await res.json();
+                } catch (e) { console.warn("Proxy failed", e); }
+            }
+            throw new Error("無法連線至數據源，請稍後再試。");
+        }
+
+        async function getStockName(symbol) {
+            if (stockNamesCache[symbol]) return stockNamesCache[symbol];
+            
+            try {
+                // Remove suffix for name query sometimes helps, but Yahoo quote endpoint handles full symbols well
+                const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}`;
+                const data = await fetchWithProxy(url);
+                const result = data.quoteResponse?.result?.[0];
+                if (result) {
+                    const name = result.shortName || result.longName || "";
+                    stockNamesCache[symbol] = name;
+                    return name;
+                }
+            } catch (e) {
+                console.warn(`無法抓取 ${symbol} 名稱`);
+            }
+            return "";
+        }
+
+        // 智慧判斷代號 (台股自動補後綴)
+        function resolveSymbol(input) {
+            input = input.trim().toUpperCase();
+            // 規則：不含點，且為 4-6 位數字 (可能帶 A/B)
+            if (!input.includes('.') && /^[0-9]{4,6}[A-Z]?$/.test(input)) {
+                return { base: input, isTaiwan: true };
+            }
+            return { base: input, isTaiwan: false };
+        }
+
+        async function fetchChartData(symbol, range) {
+            const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=${range}&interval=1d&events=div|split`;
+            const data = await fetchWithProxy(url);
+            const result = data.chart.result?.[0];
+            if (!result) throw new Error("無數據");
+            return result;
+        }
+
+        function showError(msg) {
+            document.getElementById('globalError').classList.remove('hidden');
+            document.getElementById('globalErrorMsg').innerText = msg;
+            setTimeout(() => {
+                document.getElementById('globalError').classList.add('hidden');
+            }, 5000);
+        }
+
+        // Tab Switching
+        function switchTab(tab) {
+            // Update Buttons
+            document.getElementById('tab-lahos').className = tab === 'lahos' 
+                ? "pb-3 px-1 border-b-2 font-medium text-sm transition-colors border-blue-600 text-blue-600"
+                : "pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors";
+            
+            document.getElementById('tab-compare').className = tab === 'compare'
+                ? "pb-3 px-1 border-b-2 font-medium text-sm transition-colors border-blue-600 text-blue-600"
+                : "pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors";
+
+            // Toggle Views
+            document.getElementById('view-lahos').classList.toggle('hidden', tab !== 'lahos');
+            document.getElementById('view-compare').classList.toggle('hidden', tab !== 'compare');
+        }
+
+        // ==========================================
+        // 邏輯 1: 樂活五線譜 (Lahos)
+        // ==========================================
+        let lahosChartInstance = null;
+        let lahosPeriod = '3.5';
+        const LAHOS_DAYS = { '3.5': 850, '5': 1250, '10': 2500 };
+
+        function setLahosPeriod(p) {
+            if (lahosPeriod === p) return;
+            lahosPeriod = p;
+            
+            // UI Update
+            ['3.5', '5', '10'].forEach(v => {
+                const btn = document.getElementById(`btn-lahos-${v}`);
+                if (v === p) {
+                    btn.className = "px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition";
+                } else {
+                    btn.className = "px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition";
+                }
+            });
+
+            // Re-fetch/Re-calculate if input exists
+            const input = document.getElementById('lahosInput').value;
+            if (input) fetchLahosData();
+        }
+
+        async function fetchLahosData() {
+            const inputVal = document.getElementById('lahosInput').value;
+            if (!inputVal) return;
+
+            // Reset UI
+            document.getElementById('lahosResult').classList.add('hidden');
+            document.getElementById('lahosLoading').classList.remove('hidden');
+
+            try {
+                const { base, isTaiwan } = resolveSymbol(inputVal);
+                let finalSymbol = base;
+                let chartResult = null;
+
+                if (isTaiwan) {
+                    try {
+                        finalSymbol = base + '.TW';
+                        chartResult = await fetchChartData(finalSymbol, '10y'); // Get max data for Lahos
+                    } catch {
+                        finalSymbol = base + '.TWO';
+                        chartResult = await fetchChartData(finalSymbol, '10y');
+                    }
+                } else {
+                    chartResult = await fetchChartData(finalSymbol, '10y');
+                }
+
+                // Get Name
+                const name = await getStockName(finalSymbol);
+                document.getElementById('lahosDisplaySymbol').innerText = name ? `${finalSymbol} (${name})` : finalSymbol;
+
+                processLahos(chartResult);
+
+            } catch (e) {
+                showError(e.message || "濃活五線譜計算失敗");
+            } finally {
+                document.getElementById('lahosLoading').classList.add('hidden');
+            }
+        }
+
+        function processLahos(data) {
+            const timestamps = data.timestamp;
+            const quotes = data.indicators.quote[0].close;
+            let rawData = [];
+            
+            for(let i=0; i<timestamps.length; i++) {
+                if(quotes[i] != null) {
+                    rawData.push({ date: new Date(timestamps[i]*1000), price: quotes[i] });
+                }
+            }
+
+            // Slice Data
+            const days = LAHOS_DAYS[lahosPeriod];
+            const sliceData = rawData.slice(-days);
+            
+            if (sliceData.length < 20) {
+                showError("資料不足以計算五線譜");
+                return;
+            }
+
+            // Linear Regression
+            const n = sliceData.length;
+            let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            for(let i=0; i<n; i++) {
+                sumX += i;
+                sumY += sliceData[i].price;
+                sumXY += (i * sliceData[i].price);
+                sumX2 += (i * i);
+            }
+            
+            const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+            const intercept = (sumY - slope * sumX) / n;
+
+            // Standard Deviation
+            let sumSqRes = 0;
+            const labels = [];
+            const trend = [];
+            
+            for(let i=0; i<n; i++) {
+                const pred = intercept + slope * i;
+                sumSqRes += Math.pow(sliceData[i].price - pred, 2);
+                labels.push(sliceData[i].date);
+                trend.push(pred);
+            }
+            const stdDev = Math.sqrt(sumSqRes / n);
+
+            // Generate Lines
+            const p2 = trend.map(t => t + 2 * stdDev);
+            const p1 = trend.map(t => t + 1 * stdDev);
+            const m1 = trend.map(t => t - 1 * stdDev);
+            const m2 = trend.map(t => t - 2 * stdDev);
+            const prices = sliceData.map(d => d.price);
+
+            // Update Info
+            const curPrice = prices[n-1];
+            const curTrend = trend[n-1];
+            const dev = (curPrice - curTrend) / stdDev;
+            
+            updateLahosUI(curPrice, dev, labels[n-1]);
+            renderLahosChart(labels, prices, trend, p1, p2, m1, m2);
+            document.getElementById('lahosResult').classList.remove('hidden');
+        }
+
+        function updateLahosUI(price, dev, date) {
+            document.getElementById('lahosCurrentPrice').innerText = price.toFixed(2);
+            document.getElementById('lahosDataDate').innerText = `資料日期: ${date.toISOString().split('T')[0]}`;
+            
+            const badge = document.getElementById('lahosPositionBadge');
+            const border = document.getElementById('lahosInfoCardBorder');
+            
+            let text="", bg="", color="", borderColor="";
+            
+            if(dev >= 2) { text="過熱 (極度樂觀)"; bg="bg-red-100"; color="text-red-800"; borderColor="border-red-500"; }
+            else if(dev >= 1) { text="樂觀"; bg="bg-orange-100"; color="text-orange-800"; borderColor="border-orange-400"; }
+            else if(dev > -1) { text="正常區間"; bg="bg-gray-100"; color="text-gray-800"; borderColor="border-gray-400"; }
+            else if(dev > -2) { text="便宜 (悲觀)"; bg="bg-teal-100"; color="text-teal-800"; borderColor="border-teal-400"; }
+            else { text="超跌 (極度悲觀)"; bg="bg-green-100"; color="text-green-800"; borderColor="border-green-500"; }
+            
+            badge.className = `inline-block px-4 py-2 rounded-lg text-base font-bold ${bg} ${color}`;
+            badge.innerText = text;
+            
+            border.className = "bg-white rounded-xl shadow-sm p-6 border-l-4";
+            border.classList.add(borderColor);
+            
+            // Color current price same as status
+            document.getElementById('lahosCurrentPrice').className = `text-4xl font-bold ${color.replace('800', '600')}`;
+        }
+
+        function renderLahosChart(labels, prices, trend, p1, p2, m1, m2) {
+            const ctx = document.getElementById('lahosChart').getContext('2d');
+            if(lahosChartInstance) lahosChartInstance.destroy();
+
+            lahosChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        { label: '股價', data: prices, borderColor: 'black', borderWidth: 2, pointRadius: 0, order: 1 },
+                        { label: '+2SD', data: p2, borderColor: '#ef4444', borderWidth: 1, pointRadius: 0, fill: false },
+                        { label: '+1SD', data: p1, borderColor: '#f97316', borderWidth: 1, pointRadius: 0, fill: false },
+                        { label: '趨勢', data: trend, borderColor: '#9ca3af', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false },
+                        { label: '-1SD', data: m1, borderColor: '#14b8a6', borderWidth: 1, pointRadius: 0, fill: false },
+                        { label: '-2SD', data: m2, borderColor: '#22c55e', borderWidth: 1, pointRadius: 0, fill: false }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: { labels: { usePointStyle: true, boxWidth: 6 } },
+                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}` } }
+                    },
+                    scales: {
+                        x: { 
+                            type: 'time', 
+                            time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } },
+                            grid: { display: false }
+                        },
+                        y: { position: 'right' }
+                    }
+                }
+            });
+        }
+
+
+        // ==========================================
+        // 邏輯 2: 自選績效比較 (Compare)
+        // ==========================================
+        let compareChartInstance = null;
+        let compareList = ['2330', '1101'];
+        let compareRange = '1mo';
+
+        function addCompareStock() {
+            const input = document.getElementById('compareInput');
+            const val = input.value.trim().toUpperCase();
+            if (!val) return;
+            
+            if (!compareList.includes(val)) {
+                compareList.push(val);
+                renderCompareTags();
+                refreshCompareData();
+            }
+            input.value = '';
+        }
+
+        function removeCompareStock(symbol) {
+            compareList = compareList.filter(s => s !== symbol);
+            renderCompareTags();
+            refreshCompareData();
+        }
+
+        async function renderCompareTags() {
+            const container = document.getElementById('compareTags');
+            const hint = document.getElementById('compareEmptyHint');
+            container.innerHTML = '';
+            
+            if (compareList.length === 0) {
+                hint.style.display = 'block';
+                return;
+            }
+            hint.style.display = 'none';
+
+            for (let s of compareList) {
+                const name = stockNamesCache[s] ? `(${stockNamesCache[s]})` : "";
+                const tag = document.createElement('div');
+                tag.className = "bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2";
+                tag.innerHTML = `
+                    ${s} <span class="text-xs opacity-75">${name}</span>
+                    <button onclick="removeCompareStock('${s}')" class="text-blue-600 hover:text-blue-900 focus:outline-none">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                `;
+                container.appendChild(tag);
+            }
+        }
+
+        function setCompareRange(range) {
+            if (compareRange === range) return;
+            compareRange = range;
+            
+            document.querySelectorAll('.period-btn-comp').forEach(btn => {
+                if (btn.dataset.range === range) {
+                    btn.className = "period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition";
+                } else {
+                    btn.className = "period-btn-comp px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition";
+                }
+            });
+            refreshCompareData();
+        }
+
+        async function refreshCompareData() {
+            if (compareList.length === 0) return;
+            const includeDividends = document.getElementById('dividendToggle').checked;
+            document.getElementById('dividendLabel').innerText = includeDividends ? "含息 (總報酬)" : "不含息 (價差)";
+
+            document.getElementById('compareLoading').classList.remove('hidden');
+            document.getElementById('compareResult').classList.add('hidden');
+
+            try {
+                const requests = compareList.map(async (rawInput) => {
+                    const { base, isTaiwan } = resolveSymbol(rawInput);
+                    let finalSymbol = base;
+                    let chartData = null;
+
+                    if (isTaiwan) {
+                        try {
+                            finalSymbol = base + '.TW';
+                            chartData = await fetchChartData(finalSymbol, compareRange);
+                        } catch {
+                            finalSymbol = base + '.TWO';
+                            chartData = await fetchChartData(finalSymbol, compareRange);
+                        }
+                    } else {
+                        chartData = await fetchChartData(finalSymbol, compareRange);
+                    }
+
+                    const name = await getStockName(finalSymbol);
+                    
+                    return { symbol: finalSymbol, data: chartData, name: name, rawInput: rawInput };
+                });
+
+                const results = await Promise.all(requests);
+                renderCompareTags(); // Re-render tags to show names
+
+                const datasets = processCompareResults(results, includeDividends);
+                renderCompareChart(datasets);
+                renderCompareTable(datasets);
+                
+                document.getElementById('compareResult').classList.remove('hidden');
+            } catch (e) {
+                showError("績效比較資料抓取失敗");
+            } finally {
+                document.getElementById('compareLoading').classList.add('hidden');
+            }
+        }
+
+        function processCompareResults(results, includeDividends) {
+            const processed = [];
+            
+            results.forEach((item, index) => {
+                const res = item.data;
+                const timestamps = res.timestamp || [];
+                const quote = res.indicators.quote[0];
+                const adjClose = res.indicators.adjclose?.[0]?.adjclose;
+
+                const sourceData = includeDividends ? (adjClose || quote.close) : quote.close;
+                const points = [];
+                let startPrice = null;
+
+                for(let i=0; i<timestamps.length; i++) {
+                    const p = sourceData[i];
+                    if(p != null) {
+                        if(startPrice === null) startPrice = p;
+                        points.push({
+                            x: new Date(timestamps[i]*1000),
+                            y: ((p - startPrice)/startPrice) * 100,
+                            rawPrice: p
+                        });
+                    }
+                }
+
+                if(points.length > 0) {
+                    const displayName = item.name ? `${item.rawInput} (${item.name})` : item.rawInput;
+                    processed.push({
+                        label: displayName,
+                        data: points,
+                        currentPrice: points[points.length-1].rawPrice,
+                        totalReturn: points[points.length-1].y,
+                        color: COLORS[index % COLORS.length]
+                    });
+                }
+            });
+            return processed;
+        }
+
+        function renderCompareChart(datasets) {
+            const ctx = document.getElementById('compareChart').getContext('2d');
+            if(compareChartInstance) compareChartInstance.destroy();
+
+            const chartDatasets = datasets.map(d => ({
+                label: d.label,
+                data: d.data,
+                borderColor: d.color,
+                backgroundColor: d.color,
+                borderWidth: 2,
+                pointRadius: 0,
+                pointHoverRadius: 6,
+                fill: false,
+                tension: 0.1
+            }));
+
+            compareChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: { datasets: chartDatasets },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` } },
+                        legend: { display: false } // Hide legend as requested
+                    },
+                    scales: {
+                        x: { 
+                            type: 'time', 
+                            time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } },
+                            title: { display: false }
+                        },
+                        y: {
+                            ticks: { callback: v => v + "%" },
+                            grid: { color: c => c.tick.value === 0 ? '#666' : '#e5e5e5', lineWidth: c => c.tick.value === 0 ? 2 : 1 }
+                        }
+                    }
+                }
+            });
+        }
+
+        function renderCompareTable(datasets) {
+            const tbody = document.getElementById('rankingTableBody');
+            tbody.innerHTML = '';
+            
+            const sorted = [...datasets].sort((a,b) => b.totalReturn - a.totalReturn);
+            
+            sorted.forEach(d => {
+                const tr = document.createElement('tr');
+                tr.className = "border-b hover:bg-gray-50";
+                const colorClass = d.totalReturn >= 0 ? 'text-red-600' : 'text-green-600';
+                const sign = d.totalReturn >= 0 ? '+' : '';
+                
+                tr.innerHTML = `
+                    <td class="px-3 py-3 font-medium">
+                        <div class="flex items-center gap-2">
+                            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${d.color}"></span>
+                            <span class="truncate max-w-[120px]" title="${d.label}">${d.label}</span>
+                        </div>
+                    </td>
+                    <td class="px-3 py-3 text-right text-gray-600">${d.currentPrice.toFixed(2)}</td>
+                    <td class="px-3 py-3 text-right font-bold ${colorClass}">${sign}${d.totalReturn.toFixed(2)}%</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        // Init
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchLahosData();    // Pre-load Lahos
+            renderCompareTags(); // Setup Compare Tags
+            refreshCompareData();// Pre-load Compare
+        });
+
+    </script>
+</body>
+</html>
