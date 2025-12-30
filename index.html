@@ -94,7 +94,7 @@
                         <div class="flex gap-2">
                             <input type="text" id="lahosInput" placeholder="輸入代號 (如 2330)" 
                                 class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
-                                value="2330" onkeydown="if(event.key==='Enter') fetchLahosData()">
+                                value="" onkeydown="if(event.key==='Enter') fetchLahosData()">
                             <button onclick="fetchLahosData()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
                                 分析
                             </button>
@@ -141,7 +141,7 @@
                 <!-- Lahos Chart -->
                 <div class="bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                        <span class="watermark-font text-gray-500" style="font-size: 60px; opacity: 0.3;">濃活陌生人的五線譜</span>
+                        <span class="watermark-font text-gray-500" style="font-size: 30px; opacity: 0.3;">濃活陌生人的五線譜</span>
                     </div>
                     <canvas id="lahosChart" class="relative z-10"></canvas>
                 </div>
@@ -210,7 +210,7 @@
                 <!-- Chart -->
                 <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                        <span class="watermark-font text-gray-500" style="font-size: 65px; opacity: 0.3;">陪你查報酬率的陌生人</span>
+                        <span class="watermark-font text-gray-500" style="font-size: 30px; opacity: 0.3;">陪你查報酬率的陌生人</span>
                     </div>
                     <canvas id="compareChart" class="relative z-10"></canvas>
                 </div>
@@ -747,3 +747,4 @@
 </body>
 
 </html>
+
