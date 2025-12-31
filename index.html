@@ -3,13 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>幹話台股小工具</title>
+    <title>幹話台股小工具 (技術線圖版)</title>
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Chart.js -->
+    <!-- Chart.js (保留給舊功能使用) -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Chart.js Date Adapter -->
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- ApexCharts (新增：用於 K 線圖) -->
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
     <!-- FontAwesome -->
@@ -38,6 +39,9 @@
 			font-size: 60px;
 			color: #ccc;
 			opacity: 0.3;
+            pointer-events: none; /* 確保不擋住滑鼠互動 */
+            white-space: nowrap;
+            z-index: 0;
         }
 
         /* 隱藏捲軸 */
@@ -47,6 +51,19 @@
         .no-scrollbar {
             -ms-overflow-style: none;
             scrollbar-width: none;
+        }
+        
+        /* 表格響應式 */
+        .table-responsive {
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        /* Chart 容器 */
+        .chart-container {
+            position: relative;
+            background: white;
+            z-index: 1; 
         }
     </style>
 </head>
@@ -63,7 +80,7 @@
             </div>
             
             <!-- Tabs -->
-            <div class="flex space-x-6 border-b border-gray-200 mt-2 overflow-x-auto no-scrollbar">
+            <div class="flex space-x-4 md:space-x-6 border-b border-gray-200 mt-2 overflow-x-auto no-scrollbar">
                 <button onclick="switchTab('lahos')" id="tab-lahos" class="whitespace-nowrap pb-3 px-1 border-b-2 font-medium text-sm transition-colors border-blue-600 text-blue-600">
                     濃活五線譜
                 </button>
@@ -72,6 +89,9 @@
                 </button>
                 <button onclick="switchTab('strategy')" id="tab-strategy" class="whitespace-nowrap pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
                     陌生人的選股策略
+                </button>
+                <button onclick="switchTab('tech')" id="tab-tech" class="whitespace-nowrap pb-3 px-1 border-b-2 border-transparent font-medium text-sm text-gray-500 hover:text-gray-700 hover:border-gray-300 transition-colors">
+                    技術線圖 (當日/K線)
                 </button>
             </div>
         </div>
@@ -89,7 +109,6 @@
         <!-- View 1: 樂活五線譜 (Lahos) -->
         <!-- ========================================== -->
         <div id="view-lahos" class="space-y-6">
-            <!-- Lahos Controls -->
             <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
                 <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-end">
                     <div class="w-full md:w-auto flex-grow max-w-md">
@@ -97,14 +116,12 @@
                         <div class="flex gap-2">
                             <input type="text" id="lahosInput" placeholder="輸入代號 (如 2330)" 
                                 class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
-                                value="" onkeydown="if(event.key==='Enter') fetchLahosData()">
+                                value="0050" onkeydown="if(event.key==='Enter') fetchLahosData()">
                             <button onclick="fetchLahosData()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
                                 分析
                             </button>
                         </div>
                     </div>
-                    
-                    <!-- Lahos Period Selector -->
                     <div class="flex bg-gray-100 p-1 rounded-lg">
                         <button onclick="setLahosPeriod('3.5')" id="btn-lahos-3.5" class="px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition">3.5年</button>
                         <button onclick="setLahosPeriod('5')" id="btn-lahos-5" class="px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition">5年</button>
@@ -112,16 +129,10 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Lahos Loading -->
             <div id="lahosLoading" class="hidden py-10 flex justify-center items-center gap-3">
-                <div class="loader"></div>
-                <span class="text-gray-500">正在計算回歸直線與標準差...</span>
+                <div class="loader"></div><span class="text-gray-500">正在計算回歸直線與標準差...</span>
             </div>
-
-            <!-- Lahos Result -->
             <div id="lahosResult" class="hidden space-y-6">
-                <!-- Info Cards -->
                 <div class="bg-white rounded-xl shadow-sm p-6 border-l-4" id="lahosInfoCardBorder">
                     <div class="flex justify-between items-start">
                         <div>
@@ -134,53 +145,36 @@
                         </div>
                         <div class="text-right">
                             <p class="text-sm text-gray-500 mb-1">位階判斷</p>
-                            <span id="lahosPositionBadge" class="inline-block px-4 py-2 rounded-lg text-base font-bold bg-gray-200 text-gray-700">
-                                --
-                            </span>
+                            <span id="lahosPositionBadge" class="inline-block px-4 py-2 rounded-lg text-base font-bold bg-gray-200 text-gray-700">--</span>
                         </div>
                     </div>
                 </div>
-
-                <!-- Lahos Chart -->
                 <div class="bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
-                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                        <span class="watermark-font text-gray-500" style="font-size: 30px; opacity: 0.3;">陪你查濃活5線譜的陌生人</span>
-                    </div>
+                    <div class="watermark-font">陪你查濃活5線譜的陌生人</div>
                     <canvas id="lahosChart" class="relative z-10"></canvas>
                 </div>
-                
-                <div class="text-xs text-gray-400 text-center">
-                    <p>樂活五線譜原理：利用統計學的回歸直線作為趨勢參考，並以標準差(SD)劃分股價高低位階。</p>
-                </div>
+                <div class="text-xs text-gray-400 text-center"><p>樂活五線譜原理：利用統計學的回歸直線作為趨勢參考，並以標準差(SD)劃分股價高低位階。</p></div>
             </div>
         </div>
-
 
         <!-- ========================================== -->
         <!-- View 2: 自選績效比較 (Compare) -->
         <!-- ========================================== -->
         <div id="view-compare" class="hidden space-y-6">
-            <!-- Compare Controls -->
             <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
                 <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">加入比較股票</label>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">加入比較股票 (台美通用)</label>
                     <div class="flex gap-2">
-                        <input type="text" id="compareInput" placeholder="輸入代號 (如 2330)" 
+                        <input type="text" id="compareInput" placeholder="輸入代號 (如 2330, NVDA)" 
                             class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
                             onkeydown="if(event.key==='Enter') addCompareStock()">
-                        <button onclick="addCompareStock()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
-                            加入
-                        </button>
+                        <button onclick="addCompareStock()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">加入</button>
                     </div>
-                    <!-- Tags -->
                     <div id="compareTags" class="flex flex-wrap gap-2 mt-3"></div>
                     <p id="compareEmptyHint" class="text-gray-400 text-sm italic mt-2">尚未加入任何股票，預設比較 2330 vs 1101</p>
                 </div>
-
                 <hr class="border-gray-100">
-
                 <div class="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
-                    <!-- Compare Period -->
                     <div class="flex flex-wrap bg-gray-100 p-1 rounded-lg gap-1">
                         <button onclick="setCompareRange('1d')" class="period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition" data-range="1d">日</button>
                         <button onclick="setCompareRange('5d')" class="period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="5d">週</button>
@@ -190,8 +184,6 @@
                         <button onclick="setCompareRange('1y')" class="period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="1y">1年</button>
                         <button onclick="setCompareRange('3y')" class="period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-range="3y">3年</button>
                     </div>
-
-                    <!-- Dividend Toggle -->
                     <div class="flex items-center gap-3">
                         <span class="text-sm font-medium text-gray-700">報酬計算：</span>
                         <label class="relative inline-flex items-center cursor-pointer">
@@ -202,41 +194,18 @@
                     </div>
                 </div>
             </div>
-
-            <!-- Compare Loading -->
             <div id="compareLoading" class="hidden py-10 flex justify-center items-center gap-3">
-                <div class="loader"></div>
-                <span class="text-gray-500">正在抓取並計算報酬率...</span>
+                <div class="loader"></div><span class="text-gray-500">正在抓取並計算報酬率...</span>
             </div>
-
-            <!-- Compare Result -->
             <div id="compareResult" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <!-- Chart -->
                 <div class="lg:col-span-2 bg-white rounded-xl shadow-sm p-4 h-[450px] relative overflow-hidden flex justify-center items-center">
-                    <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
-                        <span class="watermark-font text-gray-500" style="font-size: 30px; opacity: 0.3;">陪你查靈股績效的陌生人</span>
-                    </div>
+                    <div class="watermark-font">陪你查靈股績效的陌生人</div>
                     <canvas id="compareChart" class="relative z-10"></canvas>
                 </div>
-                
-                <!-- Table -->
                 <div class="lg:col-span-1 bg-white rounded-xl shadow-sm p-4">
                     <h3 class="font-bold text-gray-800 mb-4 border-b pb-2">績效排行</h3>
                     <div class="overflow-x-auto">
-                        <table class="w-full text-sm text-left">
-                            <thead class="bg-gray-50 text-gray-500">
-                                <tr>
-                                    <th class="px-3 py-2 rounded-l-lg">股票</th>
-                                    <th class="px-3 py-2 text-right">現價</th>
-                                    <th class="px-3 py-2 text-right rounded-r-lg">報酬率</th>
-                                </tr>
-                            </thead>
-                            <tbody id="rankingTableBody"></tbody>
-                        </table>
-                    </div>
-                    <div class="mt-4 text-xs text-gray-400">
-                        <p>* 含息報酬使用還原股價 (Adj Close)</p>
-                        <p>* 不含息報酬使用原始收盤價 (Close)</p>
+                        <table class="w-full text-sm text-left"><thead class="bg-gray-50 text-gray-500"><tr><th class="px-3 py-2 rounded-l-lg">股票</th><th class="px-3 py-2 text-right">現價</th><th class="px-3 py-2 text-right rounded-r-lg">報酬率</th></tr></thead><tbody id="rankingTableBody"></tbody></table>
                     </div>
                 </div>
             </div>
@@ -246,85 +215,91 @@
         <!-- View 3: 選股策略 (Strategy) -->
         <!-- ========================================== -->
         <div id="view-strategy" class="hidden space-y-6">
-            <!-- Strategy Input -->
             <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
-                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2">
-                    <i class="fa-solid fa-filter text-purple-600"></i> 選股策略：黃金切割率 (AI類股)
-                </h3>
-                
-                <!-- Filters Info -->
+                <h3 class="text-lg font-bold text-gray-800 flex items-center gap-2"><i class="fa-solid fa-filter text-purple-600"></i> 選股策略：黃金切割率 (AI類股)</h3>
                 <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200 text-sm text-gray-700 space-y-2">
-                    <p><i class="fa-solid fa-circle-info text-yellow-600"></i> <b>策略邏輯：</b></p>
-                    <ul class="list-disc list-inside ml-2">
-                        <li><b>基準日：</b>自動鎖定 20 個交易日前 (假設為近期相對高點)。</li>
-                        <li><b>區間：</b>取基準日前 120 日內的最高與最低價繪製黃金切割。</li>
-                        <li><b>排序：</b>依照目前股價與「基準區間最高價」的距離 (跌幅) 進行排序。</li>
-                    </ul>
+                    <p><b>策略邏輯：</b></p>
+                    <ul class="list-disc list-inside ml-2"><li><b>基準日：</b>自動鎖定 20 個交易日前。</li><li><b>區間：</b>取基準日前 120 日內的最高與最低價繪製黃金切割。</li><li><b>排序：</b>依照目前股價與「基準區間最高價」的距離 (跌幅) 進行排序。</li></ul>
                 </div>
-
-                <!-- Stock List -->
                 <div>
-                    <h4 class="font-bold text-gray-700 mb-2">AI 類股名單 (可自行增減)</h4>
-                    <textarea id="strategyStockList" class="w-full h-24 p-2 border border-gray-300 rounded text-sm font-mono" placeholder="輸入代號...">2330,2454,3661,3443,5274,2382,2356,3231,6669,2317,3324,3653,2308,2385,3711,2376,2357,2377,3017,2368,3037,8046,3189,6274,2383,6213,3105,2395,2439,4943,8299,6517</textarea>
+                    <h4 class="font-bold text-gray-700 mb-2">名單 (可輸入台股或美股)</h4>
+                    <textarea id="strategyStockList" class="w-full h-24 p-2 border border-gray-300 rounded text-sm font-mono" placeholder="輸入代號...">2330,2454,3661,3443,5274,2382,2356,3231,6669,2317,3324,3653,2308,2385,3711,2376,2357,2377,3017,2368,3037,8046,3189,6274,2383,6213,3105,2395,2439,4943,8299,6517,NVDA,AMD,SMCI</textarea>
                 </div>
-
-                <!-- Action -->
                 <div class="text-right">
-                    <button onclick="runStrategy()" id="btnRunStrategy" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-2 rounded-lg font-bold transition shadow-md flex items-center gap-2 ml-auto">
-                        <i class="fa-solid fa-play"></i> 執行篩選
-                    </button>
+                    <button onclick="runStrategy()" id="btnRunStrategy" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-2 rounded-lg font-bold transition shadow-md flex items-center gap-2 ml-auto"><i class="fa-solid fa-play"></i> 執行篩選</button>
                 </div>
             </div>
-
-            <!-- Strategy Result -->
             <div id="strategyResultContainer" class="bg-white rounded-xl shadow-sm p-4 md:p-6 hidden">
-                <div class="flex justify-between items-center mb-4">
-                    <h3 class="font-bold text-gray-800">篩選結果 (依距離高點差排序)</h3>
-                    <span id="strategyStatus" class="text-sm text-gray-500"></span>
-                </div>
-                
+                <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-gray-800">篩選結果 (依距離高點差排序)</h3><span id="strategyStatus" class="text-sm text-gray-500"></span></div>
                 <div class="table-responsive">
-                    <table class="w-full text-sm text-left border-collapse">
-                        <thead class="bg-gray-100 text-gray-600">
-                            <tr>
-                                <th class="p-3 whitespace-nowrap">代號/股名</th>
-                                <th class="p-3 text-right">現價</th>
-                                <th class="p-3 text-right">基準最高價<br><span class="text-xs font-normal">(20日前推120日)</span></th>
-                                <th class="p-3 text-right font-bold text-blue-700">距離高點差 %</th>
-                                <th class="p-3 text-center">黃金切割位置</th>
-                            </tr>
-                        </thead>
-                        <tbody id="strategyTableBody">
-                            <!-- JS Insert -->
-                        </tbody>
-                    </table>
-                </div>
-                <div class="mt-4 text-xs text-gray-400">
-                    <p>* 黃金切割位置：目前股價相對於基準區間 (High-Low) 的回檔位置。</p>
-                    <p>* 接近 0.382/0.5/0.618 可能為支撐觀察點。</p>
+                    <table class="w-full text-sm text-left border-collapse"><thead class="bg-gray-100 text-gray-600"><tr><th class="p-3 whitespace-nowrap">代號/股名</th><th class="p-3 text-right">現價</th><th class="p-3 text-right">基準高價</th><th class="p-3 text-right font-bold text-blue-700">距離高點差 %</th><th class="p-3 text-center">黃金切割位置</th></tr></thead><tbody id="strategyTableBody"></tbody></table>
                 </div>
             </div>
         </div>
 
+        <!-- ========================================== -->
+        <!-- View 4: 技術線圖 (Tech Charts) -->
+        <!-- ========================================== -->
+        <div id="view-tech" class="hidden space-y-6">
+            <div class="bg-white rounded-xl shadow-sm p-4 md:p-6 space-y-4">
+                <div class="flex flex-col md:flex-row gap-4 justify-between items-start md:items-end">
+                    <div class="w-full md:w-auto flex-grow max-w-md">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">輸入代號 (台股/美股)</label>
+                        <div class="flex gap-2">
+                            <input type="text" id="techInput" placeholder="如 2330 或 NVDA" 
+                                class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none uppercase"
+                                value="2330" onkeydown="if(event.key==='Enter') fetchTechChart()">
+                            <button onclick="fetchTechChart()" class="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg font-medium transition">
+                                查詢
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <!-- Timeframe Selector -->
+                    <div class="flex flex-wrap bg-gray-100 p-1 rounded-lg gap-1">
+                        <button onclick="setTechInterval('1d')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition" data-int="1d">當日</button>
+                        <button onclick="setTechInterval('day')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="day">日線</button>
+                        <button onclick="setTechInterval('week')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="week">週線</button>
+                        <button onclick="setTechInterval('month')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="month">月線</button>
+                        <button onclick="setTechInterval('quarter')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="quarter">季線</button>
+                        <button onclick="setTechInterval('half')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="half">半年線</button>
+                        <button onclick="setTechInterval('year')" class="period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition" data-int="year">年線</button>
+                    </div>
+                </div>
+            </div>
 
+            <!-- Tech Loading -->
+            <div id="techLoading" class="hidden py-10 flex justify-center items-center gap-3">
+                <div class="loader"></div>
+                <span class="text-gray-500">正在繪製圖表...</span>
+            </div>
+
+            <!-- Tech Result -->
+            <div id="techResult" class="hidden bg-white rounded-xl shadow-sm p-4 h-[500px] relative">
+                <div class="absolute inset-0 flex items-center justify-center pointer-events-none select-none z-0">
+                    <span class="watermark-font text-gray-500" style="font-size: 60px; opacity: 0.1;">陪你查技術線圖的陌生人</span>
+                </div>
+                <div class="flex items-center gap-2 mb-2 relative z-10 px-2">
+                    <h3 class="font-bold text-gray-800 text-lg" id="techTitle">--</h3>
+                    <span id="techSubtitle" class="text-sm text-gray-500"></span>
+                </div>
+                <!-- Chart Div for ApexCharts -->
+                <div id="apexChart" class="w-full h-[420px] relative z-10"></div>
+            </div>
+        </div>
 
     </main>
 
     <script>
         // ==========================================
-        // 共用設定與工具 (Shared Utils)
+        // 共用設定與工具
         // ==========================================
         const PROXIES = [
             "https://corsproxy.io/?",
             "https://api.allorigins.win/raw?url="
         ];
 
-        const COLORS = [
-            '#2563eb', '#dc2626', '#16a34a', '#d97706', 
-            '#9333ea', '#0891b2', '#be185d', '#4b5563'
-        ];
-
-        // 股票名稱快取
+        const COLORS = ['#2563eb', '#dc2626', '#16a34a', '#d97706', '#9333ea', '#0891b2', '#be185d', '#4b5563'];
         let stockNamesCache = {}; 
 
         async function fetchWithProxy(url) {
@@ -339,25 +314,19 @@
 
         async function getStockName(symbol) {
             if (stockNamesCache[symbol]) return stockNamesCache[symbol];
-            
             try {
-                // Add lang=zh-Hant-TW to force Traditional Chinese if available
                 const url = `https://query1.finance.yahoo.com/v7/finance/quote?symbols=${symbol}&lang=zh-Hant-TW&region=TW`;
                 const data = await fetchWithProxy(url);
                 const result = data.quoteResponse?.result?.[0];
                 if (result) {
-                    // Prefer longName for full Chinese name, fallback to shortName
                     const name = result.longName || result.shortName || "";
                     stockNamesCache[symbol] = name;
                     return name;
                 }
-            } catch (e) {
-                console.warn(`無法抓取 ${symbol} 名稱`);
-            }
+            } catch (e) { console.warn(`無法抓取 ${symbol} 名稱`); }
             return "";
         }
 
-        // 智慧判斷代號
         function resolveSymbol(input) {
             input = input.trim().toUpperCase();
             if (!input.includes('.') && /^[0-9]{4,6}[A-Z]?$/.test(input)) {
@@ -377,14 +346,11 @@
         function showError(msg) {
             document.getElementById('globalError').classList.remove('hidden');
             document.getElementById('globalErrorMsg').innerText = msg;
-            setTimeout(() => {
-                document.getElementById('globalError').classList.add('hidden');
-            }, 5000);
+            setTimeout(() => { document.getElementById('globalError').classList.add('hidden'); }, 5000);
         }
 
-        // Tab Switching
         function switchTab(tab) {
-            const tabs = ['lahos', 'compare', 'strategy', 'fundamental'];
+            const tabs = ['lahos', 'compare', 'strategy', 'tech'];
             tabs.forEach(t => {
                 const btn = document.getElementById(`tab-${t}`);
                 if (t === tab) {
@@ -397,6 +363,8 @@
             });
         }
 
+        // ... [保留原本 Lahos, Compare, Strategy 的 JS 邏輯，此處省略以節省篇幅，請確保這部分程式碼存在] ...
+        
         // ==========================================
         // 邏輯 1: 樂活五線譜 (Lahos)
         // ==========================================
@@ -407,16 +375,10 @@
         function setLahosPeriod(p) {
             if (lahosPeriod === p) return;
             lahosPeriod = p;
-            
             ['3.5', '5', '10'].forEach(v => {
                 const btn = document.getElementById(`btn-lahos-${v}`);
-                if (v === p) {
-                    btn.className = "px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition";
-                } else {
-                    btn.className = "px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition";
-                }
+                btn.className = (v === p) ? "px-4 py-1.5 text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition" : "px-4 py-1.5 text-sm font-medium rounded-md text-gray-600 hover:text-gray-900 transition";
             });
-
             const input = document.getElementById('lahosInput').value;
             if (input) fetchLahosData();
         }
@@ -424,15 +386,12 @@
         async function fetchLahosData() {
             const inputVal = document.getElementById('lahosInput').value;
             if (!inputVal) return;
-
             document.getElementById('lahosResult').classList.add('hidden');
             document.getElementById('lahosLoading').classList.remove('hidden');
-
             try {
                 const { base, isTaiwan } = resolveSymbol(inputVal);
                 let finalSymbol = base;
                 let chartResult = null;
-
                 if (isTaiwan) {
                     try {
                         finalSymbol = base + '.TW';
@@ -442,14 +401,12 @@
                         chartResult = await fetchChartData(finalSymbol, '10y');
                     }
                 } else {
+                    finalSymbol = base;
                     chartResult = await fetchChartData(finalSymbol, '10y');
                 }
-
                 const name = await getStockName(finalSymbol);
                 document.getElementById('lahosDisplaySymbol').innerText = name ? `${finalSymbol} (${name})` : finalSymbol;
-
                 processLahos(chartResult);
-
             } catch (e) {
                 showError(e.message || "樂活五線譜計算失敗");
             } finally {
@@ -461,37 +418,17 @@
             const timestamps = data.timestamp;
             const quotes = data.indicators.quote[0].close;
             let rawData = [];
-            
-            for(let i=0; i<timestamps.length; i++) {
-                if(quotes[i] != null) {
-                    rawData.push({ date: new Date(timestamps[i]*1000), price: quotes[i] });
-                }
-            }
-
+            for(let i=0; i<timestamps.length; i++) { if(quotes[i] != null) rawData.push({ date: new Date(timestamps[i]*1000), price: quotes[i] }); }
             const days = LAHOS_DAYS[lahosPeriod];
             const sliceData = rawData.slice(-days);
-            
-            if (sliceData.length < 20) {
-                showError("資料不足以計算五線譜");
-                return;
-            }
-
+            if (sliceData.length < 20) { showError("資料不足以計算"); return; }
             const n = sliceData.length;
             let sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
-            for(let i=0; i<n; i++) {
-                sumX += i;
-                sumY += sliceData[i].price;
-                sumXY += (i * sliceData[i].price);
-                sumX2 += (i * i);
-            }
-            
+            for(let i=0; i<n; i++) { sumX += i; sumY += sliceData[i].price; sumXY += i*sliceData[i].price; sumX2 += i*i; }
             const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
             const intercept = (sumY - slope * sumX) / n;
-
             let sumSqRes = 0;
-            const labels = [];
-            const trend = [];
-            
+            const labels = [], trend = [];
             for(let i=0; i<n; i++) {
                 const pred = intercept + slope * i;
                 sumSqRes += Math.pow(sliceData[i].price - pred, 2);
@@ -499,17 +436,14 @@
                 trend.push(pred);
             }
             const stdDev = Math.sqrt(sumSqRes / n);
-
             const p2 = trend.map(t => t + 2 * stdDev);
             const p1 = trend.map(t => t + 1 * stdDev);
             const m1 = trend.map(t => t - 1 * stdDev);
             const m2 = trend.map(t => t - 2 * stdDev);
             const prices = sliceData.map(d => d.price);
-
             const curPrice = prices[n-1];
             const curTrend = trend[n-1];
             const dev = (curPrice - curTrend) / stdDev;
-            
             updateLahosUI(curPrice, dev, labels[n-1]);
             renderLahosChart(labels, prices, trend, p1, p2, m1, m2);
             document.getElementById('lahosResult').classList.remove('hidden');
@@ -518,425 +452,279 @@
         function updateLahosUI(price, dev, date) {
             document.getElementById('lahosCurrentPrice').innerText = price.toFixed(2);
             document.getElementById('lahosDataDate').innerText = `資料日期: ${date.toISOString().split('T')[0]}`;
-            
             const badge = document.getElementById('lahosPositionBadge');
             const border = document.getElementById('lahosInfoCardBorder');
-            
             let text="", bg="", color="", borderColor="";
-            
-            if(dev >= 2) { text="過熱 (極度樂觀)"; bg="bg-red-100"; color="text-red-800"; borderColor="border-red-500"; }
+            if(dev >= 2) { text="過熱"; bg="bg-red-100"; color="text-red-800"; borderColor="border-red-500"; }
             else if(dev >= 1) { text="樂觀"; bg="bg-orange-100"; color="text-orange-800"; borderColor="border-orange-400"; }
-            else if(dev > -1) { text="正常區間"; bg="bg-gray-100"; color="text-gray-800"; borderColor="border-gray-400"; }
-            else if(dev > -2) { text="便宜 (悲觀)"; bg="bg-teal-100"; color="text-teal-800"; borderColor="border-teal-400"; }
-            else { text="超跌 (極度悲觀)"; bg="bg-green-100"; color="text-green-800"; borderColor="border-green-500"; }
-            
+            else if(dev > -1) { text="正常"; bg="bg-gray-100"; color="text-gray-800"; borderColor="border-gray-400"; }
+            else if(dev > -2) { text="便宜"; bg="bg-teal-100"; color="text-teal-800"; borderColor="border-teal-400"; }
+            else { text="超跌"; bg="bg-green-100"; color="text-green-800"; borderColor="border-green-500"; }
             badge.className = `inline-block px-4 py-2 rounded-lg text-base font-bold ${bg} ${color}`;
             badge.innerText = text;
-            
             border.className = "bg-white rounded-xl shadow-sm p-6 border-l-4";
             border.classList.add(borderColor);
-            
             document.getElementById('lahosCurrentPrice').className = `text-4xl font-bold ${color.replace('800', '600')}`;
         }
 
         function renderLahosChart(labels, prices, trend, p1, p2, m1, m2) {
             const ctx = document.getElementById('lahosChart').getContext('2d');
             if(lahosChartInstance) lahosChartInstance.destroy();
-
             lahosChartInstance = new Chart(ctx, {
                 type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [
-                        { label: '股價', data: prices, borderColor: 'black', borderWidth: 2, pointRadius: 0, order: 1 },
-                        { label: '+2SD', data: p2, borderColor: '#ef4444', borderWidth: 1, pointRadius: 0, fill: false },
-                        { label: '+1SD', data: p1, borderColor: '#f97316', borderWidth: 1, pointRadius: 0, fill: false },
-                        { label: '趨勢', data: trend, borderColor: '#9ca3af', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false },
-                        { label: '-1SD', data: m1, borderColor: '#14b8a6', borderWidth: 1, pointRadius: 0, fill: false },
-                        { label: '-2SD', data: m2, borderColor: '#22c55e', borderWidth: 1, pointRadius: 0, fill: false }
-                    ]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: { mode: 'index', intersect: false },
-                    plugins: {
-                        legend: { labels: { usePointStyle: true, boxWidth: 6 } },
-                        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}` } }
-                    },
-                    scales: {
-                        x: { 
-                            type: 'time', 
-                            time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } },
-                            grid: { display: false }
-                        },
-                        y: { position: 'right' }
-                    }
-                }
+                data: { labels: labels, datasets: [{ label: '股價', data: prices, borderColor: 'black', borderWidth: 2, pointRadius: 0, order: 1 }, { label: '+2SD', data: p2, borderColor: '#ef4444', borderWidth: 1, pointRadius: 0, fill: false }, { label: '+1SD', data: p1, borderColor: '#f97316', borderWidth: 1, pointRadius: 0, fill: false }, { label: '趨勢', data: trend, borderColor: '#9ca3af', borderWidth: 1, borderDash: [5,5], pointRadius: 0, fill: false }, { label: '-1SD', data: m1, borderColor: '#14b8a6', borderWidth: 1, pointRadius: 0, fill: false }, { label: '-2SD', data: m2, borderColor: '#22c55e', borderWidth: 1, pointRadius: 0, fill: false }] },
+                options: { responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false }, plugins: { legend: { labels: { usePointStyle: true, boxWidth: 6 } }, tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}` } } }, scales: { x: { type: 'time', time: { unit: 'month', displayFormats: { month: 'yyyy/MM' } }, grid: { display: false } }, y: { position: 'right' } } }
             });
         }
 
+        // Compare Logic
+        let compareChartInstance = null; let compareList = ['2330', '1101']; let compareRange = '1d';
+        function addCompareStock() { const v = document.getElementById('compareInput').value.trim().toUpperCase(); if(v && !compareList.includes(v)) { compareList.push(v); renderCompareTags(); refreshCompareData(); } document.getElementById('compareInput').value=''; }
+        function removeCompareStock(s) { compareList = compareList.filter(x => x!==s); renderCompareTags(); refreshCompareData(); }
+        async function renderCompareTags() { const c = document.getElementById('compareTags'); c.innerHTML=''; if(!compareList.length) { document.getElementById('compareEmptyHint').style.display='block'; return; } document.getElementById('compareEmptyHint').style.display='none'; for(let s of compareList) { const n = stockNamesCache[s]||""; c.innerHTML += `<div class="bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2">${s} <span class="text-xs opacity-75">${n}</span> <button onclick="removeCompareStock('${s}')" class="text-blue-600 hover:text-blue-900"><i class="fa-solid fa-xmark"></i></button></div>`; } }
+        function setCompareRange(r) { compareRange=r; document.querySelectorAll('.period-btn-comp').forEach(b => b.className = b.dataset.range===r ? "period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition" : "period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition"); refreshCompareData(); }
+        async function refreshCompareData() { if(!compareList.length) return; document.getElementById('compareLoading').classList.remove('hidden'); document.getElementById('compareResult').classList.add('hidden'); const isDiv = document.getElementById('dividendToggle').checked; try { const reqs = compareList.map(async (raw) => { const {base, isTaiwan} = resolveSymbol(raw); let final=base; let range=compareRange, interval='1d'; if(compareRange==='3y') range='5y'; if(compareRange==='1d') interval='5m'; if(compareRange==='5d') interval='60m'; if(isTaiwan) { try { final=base+'.TW'; await fetchChartData(final, range, interval); } catch { final=base+'.TWO'; } } const data = await fetchChartData(final, range, interval); const name = await getStockName(final); return {symbol: final, data: data, name: name, rawInput: raw}; }); const res = await Promise.all(reqs); renderCompareTags(); const ds = processCompareResults(res, isDiv); renderCompareChart(ds); renderCompareTable(ds); document.getElementById('compareResult').classList.remove('hidden'); } catch(e) { showError("資料抓取失敗"); } finally { document.getElementById('compareLoading').classList.add('hidden'); } }
+        function processCompareResults(results, isDiv) { const processed=[]; results.forEach((item, idx) => { const res=item.data; const ts=res.timestamp||[]; const q=res.indicators.quote[0]; const adj=res.indicators.adjclose?.[0]?.adjclose; const src=(isDiv&&adj)?adj:q.close; let pts=[]; for(let i=0; i<ts.length; i++) { if(src[i]!=null) pts.push({x: new Date(ts[i]*1000), rawPrice: src[i]}); } if(compareRange==='3y') { const d=new Date(); d.setFullYear(d.getFullYear()-3); pts=pts.filter(p=>p.x>=d); } if(pts.length) { const start=pts[0].rawPrice; const dis=pts.map(p=>({x:p.x, y:((p.rawPrice-start)/start)*100, rawPrice:p.rawPrice})); processed.push({label: item.name?`${item.rawInput} (${item.name})`:item.rawInput, data: dis, currentPrice: dis[dis.length-1].rawPrice, totalReturn: dis[dis.length-1].y, color: COLORS[idx%COLORS.length]}); } }); return processed; }
+        function renderCompareChart(ds) { const ctx=document.getElementById('compareChart').getContext('2d'); if(compareChartInstance) compareChartInstance.destroy(); let unit='month', fmt='yyyy-MM-dd'; if(compareRange==='1d'||compareRange==='5d') {unit='hour'; fmt='MM-dd HH:mm';} const cds=ds.map(d=>({label:d.label, data:d.data, borderColor:d.color, backgroundColor:d.color, borderWidth:2, pointRadius:0, fill:false, tension:0.1})); compareChartInstance=new Chart(ctx, {type:'line', data:{datasets:cds}, options:{responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, plugins:{legend:{display:false}, tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.parsed.y.toFixed(2)}%`}}}, scales:{x:{type:'time', time:{unit:unit, tooltipFormat:fmt}, title:{display:false}}, y:{ticks:{callback:v=>v+"%"}, grid:{color:c=>c.tick.value===0?'#666':'#e5e5e5', lineWidth:c=>c.tick.value===0?2:1}}}}}); }
+        function renderCompareTable(ds) { const b=document.getElementById('rankingTableBody'); b.innerHTML=''; ds.sort((x,y)=>y.totalReturn-x.totalReturn).forEach(d=>{ const c=d.totalReturn>=0?'text-red-600':'text-green-600'; b.innerHTML+=`<tr class="border-b hover:bg-gray-50"><td class="px-3 py-3 font-medium flex items-center gap-2"><span class="w-3 h-3 rounded-full" style="background-color:${d.color}"></span><span>${d.label}</span></td><td class="px-3 py-3 text-right">${d.currentPrice.toFixed(2)}</td><td class="px-3 py-3 text-right font-bold ${c}">${d.totalReturn>0?'+':''}${d.totalReturn.toFixed(2)}%</td></tr>`; }); }
+
+        // Strategy Logic
+        async function runStrategy() { const txt = document.getElementById('strategyStockList').value; const lst = txt.split(/[,\n]/).map(s=>s.trim()).filter(s=>s); if(!lst.length) { showError("請輸入代號"); return; } const btn = document.getElementById('btnRunStrategy'); btn.innerHTML='<div class="loader w-4 h-4 border-2"></div> 處理中...'; btn.disabled=true; document.getElementById('strategyResultContainer').classList.remove('hidden'); const tb = document.getElementById('strategyTableBody'); tb.innerHTML='<tr><td colspan="5" class="p-4 text-center text-gray-500">分析中...</td></tr>'; let res=[]; for(const r of lst) { try { const {base, isTaiwan} = resolveSymbol(r); let final=base; if(isTaiwan) { try { final=base+'.TW'; await fetchChartData(final, '1y'); } catch { final=base+'.TWO'; await fetchChartData(final, '1y'); } } else { await fetchChartData(final, '1y'); } const d = await fetchChartData(final, '1y'); const m = calcStrategyMetrics(d); const n = await getStockName(final); if(m) res.push({symbol:final, name:n, ...m}); } catch(e){} } res.sort((a,b)=>b.distHighPct-a.distHighPct); let html=""; res.forEach(r=>{ const c=r.distHighPct>=0?'text-red-600':'text-green-600'; let s="text-gray-500"; if(r.fibPos.includes("0.382")) s="text-blue-600 font-bold"; if(r.fibPos.includes("0.5")) s="text-purple-600 font-bold"; if(r.fibPos.includes("0.618")) s="text-orange-600 font-bold"; html+=`<tr class="border-b hover:bg-gray-50"><td class="p-3"><div class="font-bold text-gray-800">${r.symbol}</div><div class="text-xs text-gray-500">${r.name}</div></td><td class="p-3 text-right font-bold">${r.price.toFixed(2)}</td><td class="p-3 text-right text-gray-600">${r.highRef.toFixed(2)}</td><td class="p-3 text-right font-bold ${c}">${r.distHighPct.toFixed(2)}%</td><td class="p-3 text-center text-sm ${s}">${r.fibPos}</td></tr>`; }); if(!res.length) html='<tr><td colspan="5" class="p-4 text-center">無資料</td></tr>'; tb.innerHTML=html; document.getElementById('strategyStatus').innerText=`完成，共 ${res.length} 檔`; btn.innerHTML='<i class="fa-solid fa-play"></i> 執行篩選'; btn.disabled=false; }
+        function calcStrategyMetrics(data) { const q=data.indicators.quote[0].close.filter(x=>x!=null); if(q.length<140) return null; const cur=q[q.length-1]; const refIdx=q.length-1-20; if(refIdx<0) return null; const win=q.slice(Math.max(0, refIdx-120), refIdx+1); const h=Math.max(...win); const l=Math.min(...win); const dist=((cur-h)/h)*100; const range=h-l; const ret=(h-cur)/range; let pos="區間外"; const t=0.05; if(cur>h) pos="創高"; else if(cur<l) pos="破底"; else { if(Math.abs(ret-0.382)<t) pos="近 0.382"; else if(Math.abs(ret-0.5)<t) pos="近 0.5"; else if(Math.abs(ret-0.618)<t) pos="近 0.618"; else pos=`回檔 ${(ret*100).toFixed(0)}%`; } return {price:cur, highRef:h, distHighPct:dist, fibPos:pos}; }
 
         // ==========================================
-        // 邏輯 2: 自選績效比較 (Compare)
+        // 邏輯 4: 技術線圖 (Tech / K-line)
         // ==========================================
-        let compareChartInstance = null;
-        let compareList = ['2330', '1101'];
-        let compareRange = '1d';
+        let apexChartInstance = null;
+        let currentTechInterval = '1d';
 
-        function addCompareStock() {
-            const input = document.getElementById('compareInput');
-            const val = input.value.trim().toUpperCase();
-            if (!val) return;
-            if (!compareList.includes(val)) {
-                compareList.push(val);
-                renderCompareTags();
-                refreshCompareData();
-            }
-            input.value = '';
-        }
-
-        function removeCompareStock(symbol) {
-            compareList = compareList.filter(s => s !== symbol);
-            renderCompareTags();
-            refreshCompareData();
-        }
-
-        async function renderCompareTags() {
-            const container = document.getElementById('compareTags');
-            const hint = document.getElementById('compareEmptyHint');
-            container.innerHTML = '';
+        function setTechInterval(int) {
+            if (currentTechInterval === int) return;
+            currentTechInterval = int;
             
-            if (compareList.length === 0) {
-                hint.style.display = 'block';
-                return;
-            }
-            hint.style.display = 'none';
-
-            for (let s of compareList) {
-                const name = stockNamesCache[s] ? `(${stockNamesCache[s]})` : "";
-                const tag = document.createElement('div');
-                tag.className = "bg-blue-100 text-blue-800 text-sm font-medium px-3 py-1 rounded-full flex items-center gap-2";
-                tag.innerHTML = `
-                    ${s} <span class="text-xs opacity-75">${name}</span>
-                    <button onclick="removeCompareStock('${s}')" class="text-blue-600 hover:text-blue-900 focus:outline-none">
-                        <i class="fa-solid fa-xmark"></i>
-                    </button>
-                `;
-                container.appendChild(tag);
-            }
-        }
-
-        function setCompareRange(range) {
-            if (compareRange === range) return;
-            compareRange = range;
-            document.querySelectorAll('.period-btn-comp').forEach(btn => {
-                btn.className = (btn.dataset.range === range)
-                    ? "period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition"
-                    : "period-btn-comp px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition";
+            document.querySelectorAll('.period-btn-tech').forEach(btn => {
+                btn.className = (btn.dataset.int === int)
+                    ? "period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md bg-white shadow-sm text-blue-700 transition"
+                    : "period-btn-tech px-3 py-1.5 text-xs sm:text-sm font-medium rounded-md text-gray-600 hover:bg-white hover:shadow-sm transition";
             });
-            refreshCompareData();
+            fetchTechChart();
         }
 
-        async function refreshCompareData() {
-            if (compareList.length === 0) return;
-            const includeDividends = document.getElementById('dividendToggle').checked;
-            document.getElementById('dividendLabel').innerText = includeDividends ? "含息 (總報酬)" : "不含息 (價差)";
+        async function fetchTechChart() {
+            const inputVal = document.getElementById('techInput').value;
+            if(!inputVal) return;
 
-            document.getElementById('compareLoading').classList.remove('hidden');
-            document.getElementById('compareResult').classList.add('hidden');
+            document.getElementById('techResult').classList.add('hidden');
+            document.getElementById('techLoading').classList.remove('hidden');
 
             try {
-                const requests = compareList.map(async (rawInput) => {
-                    const { base, isTaiwan } = resolveSymbol(rawInput);
-                    let finalSymbol = base;
-                    let chartData = null;
-                    let fetchRange = compareRange;
-                    let fetchInterval = '1d';
+                const { base, isTaiwan } = resolveSymbol(inputVal);
+                let finalSymbol = base;
+                let range = '1d', interval = '1m';
 
-                    if (compareRange === '3y') fetchRange = '5y'; 
-                    if (compareRange === '1d') fetchInterval = '5m';
-                    if (compareRange === '5d') fetchInterval = '60m';
+                // Determine params based on interval
+                switch(currentTechInterval) {
+                    case '1d': range = '1d'; interval = '1m'; break; // Intraday
+                    case 'day': range = '1y'; interval = '1d'; break;
+                    case 'week': range = '2y'; interval = '1wk'; break;
+                    case 'month': range = '5y'; interval = '1mo'; break;
+                    case 'quarter': range = '5y'; interval = '1mo'; break; // Aggregate
+                    case 'half': range = '10y'; interval = '1mo'; break; // Aggregate
+                    case 'year': range = '10y'; interval = '1mo'; break; // Aggregate
+                }
 
-                    if (isTaiwan) {
-                        try {
-                            finalSymbol = base + '.TW';
-                            chartData = await fetchChartData(finalSymbol, fetchRange, fetchInterval);
-                        } catch {
-                            finalSymbol = base + '.TWO';
-                            chartData = await fetchChartData(finalSymbol, fetchRange, fetchInterval);
-                        }
-                    } else {
-                        chartData = await fetchChartData(finalSymbol, fetchRange, fetchInterval);
+                if (isTaiwan) {
+                    try {
+                        const test = await fetchChartData(base + '.TW', '1d', '1d'); // quick check
+                        finalSymbol = base + '.TW';
+                    } catch {
+                        finalSymbol = base + '.TWO';
                     }
+                } else {
+                    finalSymbol = base;
+                }
 
-                    const name = await getStockName(finalSymbol);
-                    return { symbol: finalSymbol, data: chartData, name: name, rawInput: rawInput };
-                });
+                // Fetch Data
+                const data = await fetchChartData(finalSymbol, range, interval);
+                const name = await getStockName(finalSymbol);
+                
+                // Update Header
+                document.getElementById('techTitle').innerText = `${finalSymbol} ${name}`;
+                
+                // Render
+                renderApexChart(data, currentTechInterval);
+                document.getElementById('techResult').classList.remove('hidden');
 
-                const results = await Promise.all(requests);
-                renderCompareTags(); 
-                const datasets = processCompareResults(results, includeDividends);
-                renderCompareChart(datasets);
-                renderCompareTable(datasets);
-                document.getElementById('compareResult').classList.remove('hidden');
-            } catch (e) {
-                showError("績效比較資料抓取失敗");
+            } catch(e) {
+                console.error(e);
+                showError("無法取得線圖資料");
             } finally {
-                document.getElementById('compareLoading').classList.add('hidden');
+                document.getElementById('techLoading').classList.add('hidden');
             }
         }
 
-        function processCompareResults(results, includeDividends) {
-            const processed = [];
-            results.forEach((item, index) => {
-                const res = item.data;
-                const timestamps = res.timestamp || [];
-                const quote = res.indicators.quote[0];
-                const adjClose = res.indicators.adjclose?.[0]?.adjclose;
-                const sourceData = (includeDividends && adjClose) ? adjClose : quote.close;
-                let points = [];
-                
-                for(let i=0; i<timestamps.length; i++) {
-                    const p = sourceData[i];
-                    if(p != null) {
-                        points.push({ x: new Date(timestamps[i]*1000), rawPrice: p });
-                    }
-                }
-
-                if (compareRange === '3y' && points.length > 0) {
-                    const threeYearsAgo = new Date();
-                    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
-                    points = points.filter(pt => pt.x >= threeYearsAgo);
-                }
-
-                if(points.length > 0) {
-                    const startPrice = points[0].rawPrice;
-                    const displayData = points.map(pt => ({
-                        x: pt.x,
-                        y: ((pt.rawPrice - startPrice) / startPrice) * 100,
-                        rawPrice: pt.rawPrice
-                    }));
-                    const displayName = item.name ? `${item.rawInput} (${item.name})` : item.rawInput;
-                    processed.push({
-                        label: displayName,
-                        data: displayData,
-                        currentPrice: displayData[displayData.length-1].rawPrice,
-                        totalReturn: displayData[displayData.length-1].y,
-                        color: COLORS[index % COLORS.length]
+        function renderApexChart(data, intervalType) {
+            const timestamps = data.timestamp;
+            const quote = data.indicators.quote[0];
+            const closes = quote.close;
+            const opens = quote.open;
+            const highs = quote.high;
+            const lows = quote.low;
+            
+            // Transform Data
+            let ohlcData = [];
+            
+            // Raw Data Construction
+            for(let i=0; i<timestamps.length; i++) {
+                if (closes[i] != null && opens[i] != null) {
+                    ohlcData.push({
+                        x: new Date(timestamps[i] * 1000),
+                        y: [opens[i], highs[i], lows[i], closes[i]] // OHLC format for Apex
                     });
                 }
-            });
-            return processed;
-        }
-
-        function renderCompareChart(datasets) {
-            const ctx = document.getElementById('compareChart').getContext('2d');
-            if(compareChartInstance) compareChartInstance.destroy();
-            let timeUnit = 'month', tooltipFmt = 'yyyy-MM-dd';
-            if (compareRange === '1d' || compareRange === '5d') { timeUnit = 'hour'; tooltipFmt = 'MM-dd HH:mm'; }
-
-            const chartDatasets = datasets.map(d => ({
-                label: d.label, data: d.data, borderColor: d.color, backgroundColor: d.color,
-                borderWidth: 2, pointRadius: 0, pointHoverRadius: 6, fill: false, tension: 0.1
-            }));
-
-            compareChartInstance = new Chart(ctx, {
-                type: 'line',
-                data: { datasets: chartDatasets },
-                options: {
-                    responsive: true, maintainAspectRatio: false, interaction: { mode: 'index', intersect: false },
-                    plugins: { tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.parsed.y.toFixed(2)}%` } }, legend: { display: false } },
-                    scales: { x: { type: 'time', time: { tooltipFormat: tooltipFmt, unit: timeUnit }, title: { display: false } },
-                              y: { ticks: { callback: v => v + "%" }, grid: { color: c => c.tick.value === 0 ? '#666' : '#e5e5e5', lineWidth: c => c.tick.value === 0 ? 2 : 1 } } }
-                }
-            });
-        }
-
-        function renderCompareTable(datasets) {
-            const tbody = document.getElementById('rankingTableBody');
-            tbody.innerHTML = '';
-            const sorted = [...datasets].sort((a,b) => b.totalReturn - a.totalReturn);
-            sorted.forEach(d => {
-                const tr = document.createElement('tr');
-                tr.className = "border-b hover:bg-gray-50";
-                const colorClass = d.totalReturn >= 0 ? 'text-red-600' : 'text-green-600';
-                const sign = d.totalReturn >= 0 ? '+' : '';
-                tr.innerHTML = `
-                    <td class="px-3 py-3 font-medium">
-                        <div class="flex items-center gap-2">
-                            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background-color: ${d.color}"></span>
-                            <span class="truncate max-w-[120px]" title="${d.label}">${d.label}</span>
-                        </div>
-                    </td>
-                    <td class="px-3 py-3 text-right text-gray-600">${d.currentPrice.toFixed(2)}</td>
-                    <td class="px-3 py-3 text-right font-bold ${colorClass}">${sign}${d.totalReturn.toFixed(2)}%</td>
-                `;
-                tbody.appendChild(tr);
-            });
-        }
-
-        // ==========================================
-        // 邏輯 3: 選股策略 1 (Strategy) - 黃金切割
-        // ==========================================
-        async function runStrategy() {
-            const listText = document.getElementById('strategyStockList').value;
-            const stockList = listText.split(/[,\n]/).map(s => s.trim()).filter(s => s);
-            
-            if (stockList.length === 0) { showError("請輸入股票代號"); return; }
-
-            const btn = document.getElementById('btnRunStrategy');
-            btn.innerHTML = '<div class="loader w-4 h-4 border-2"></div> 篩選中...';
-            btn.disabled = true;
-            document.getElementById('strategyResultContainer').classList.remove('hidden');
-            const tbody = document.getElementById('strategyTableBody');
-            tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-500">正在分析數據，請稍候...</td></tr>';
-            
-            let results = [];
-
-            // 批次執行
-            for (const rawSymbol of stockList) {
-                try {
-                    const { base, isTaiwan } = resolveSymbol(rawSymbol);
-                    let finalSymbol = base;
-                    let chartData = null;
-
-                    if (isTaiwan) {
-                        try {
-                            finalSymbol = base + '.TW';
-                            // 抓取 250 天資料 (足以涵蓋 120 + 20)
-                            chartData = await fetchChartData(finalSymbol, '1y'); 
-                        } catch {
-                            finalSymbol = base + '.TWO';
-                            chartData = await fetchChartData(finalSymbol, '1y');
-                        }
-                    } else {
-                        chartData = await fetchChartData(finalSymbol, '1y');
-                    }
-
-                    const metrics = calculateStrategyMetrics(chartData);
-                    const name = await getStockName(finalSymbol);
-                    
-                    if (metrics) {
-                        results.push({
-                            symbol: finalSymbol,
-                            name: name,
-                            price: metrics.price,
-                            highRef: metrics.highRef,
-                            distHighPct: metrics.distHighPct,
-                            fibPos: metrics.fibPos
-                        });
-                    }
-
-                } catch (e) {
-                    console.warn(`Failed ${rawSymbol}`, e);
-                }
             }
 
-            // 排序：依據 "距離高點差 %" (Drawdown) 
-            // 越接近 0 (跌越少) 或 跌越多 (負越多) ? 
-            // 抄底策略通常找回檔深的，但 "距離高點差%" 越小表示越接近高點
-            // 這裡我們預設由大到小 (接近 0 的排前面)
-            results.sort((a, b) => b.distHighPct - a.distHighPct);
-
-            let html = "";
-            results.forEach(r => {
-                const pctClass = r.distHighPct >= 0 ? 'text-red-600' : 'text-green-600';
+            // Aggregation Logic for Quarter/Half/Year
+            if (intervalType === 'quarter' || intervalType === 'half' || intervalType === 'year') {
+                let groupSize = 3; // default quarter
+                if (intervalType === 'half') groupSize = 6;
+                if (intervalType === 'year') groupSize = 12;
                 
-                // Highlight Golden Ratio areas
-                let posStyle = "text-gray-500";
-                if (r.fibPos.includes("0.382")) posStyle = "text-blue-600 font-bold";
-                if (r.fibPos.includes("0.5")) posStyle = "text-purple-600 font-bold";
-                if (r.fibPos.includes("0.618")) posStyle = "text-orange-600 font-bold";
-
-                html += `
-                    <tr class="border-b hover:bg-gray-50">
-                        <td class="p-3">
-                            <div class="font-bold text-gray-800">${r.symbol}</div>
-                            <div class="text-xs text-gray-500">${r.name}</div>
-                        </td>
-                        <td class="p-3 text-right font-bold">${r.price.toFixed(2)}</td>
-                        <td class="p-3 text-right text-gray-600">${r.highRef.toFixed(2)}</td>
-                        <td class="p-3 text-right font-bold ${pctClass}">${r.distHighPct.toFixed(2)}%</td>
-                        <td class="p-3 text-center text-sm ${posStyle}">${r.fibPos}</td>
-                    </tr>
-                `;
-            });
-
-            if (results.length === 0) {
-                html = '<tr><td colspan="5" class="p-4 text-center text-gray-500">無符合數據</td></tr>';
+                // Group monthly data
+                let aggregated = [];
+                // Sort by date just in case
+                ohlcData.sort((a,b) => a.x - b.x);
+                
+                for (let i = 0; i < ohlcData.length; i += groupSize) {
+                    const chunk = ohlcData.slice(i, i + groupSize);
+                    if (chunk.length === 0) break;
+                    
+                    const open = chunk[0].y[0];
+                    const close = chunk[chunk.length - 1].y[3];
+                    const high = Math.max(...chunk.map(c => c.y[1]));
+                    const low = Math.min(...chunk.map(c => c.y[2]));
+                    const date = chunk[0].x; // Use start date
+                    
+                    aggregated.push({
+                        x: date,
+                        y: [open, high, low, close]
+                    });
+                }
+                ohlcData = aggregated;
             }
 
-            tbody.innerHTML = html;
-            document.getElementById('strategyStatus').innerText = `已完成，共 ${results.length} 檔`;
-            btn.innerHTML = '<i class="fa-solid fa-play"></i> 執行篩選';
-            btn.disabled = false;
-        }
-
-        function calculateStrategyMetrics(data) {
-            const quotes = data.indicators.quote[0].close;
-            // Filter nulls but keep date alignment roughly implies removing gaps
-            // For precise date math, we should use timestamps, but simple array index is approx 1d
-            const cleanQuotes = quotes.filter(q => q != null);
-            
-            const len = cleanQuotes.length;
-            if (len < 140) return null; // Need 20 + 120
-
-            // 1. Current Price (Today)
-            const currentPrice = cleanQuotes[len - 1];
-
-            // 2. Reference Point: 20 days ago
-            // Data index for 20 days ago
-            const refIndex = len - 1 - 20;
-            if (refIndex < 0) return null;
-
-            // 3. Window: 120 days BEFORE refIndex
-            // Slice [refIndex - 120, refIndex]
-            const startIndex = Math.max(0, refIndex - 120);
-            const windowData = cleanQuotes.slice(startIndex, refIndex + 1); // +1 to include refIndex
-
-            // 4. High/Low in Window
-            const highRef = Math.max(...windowData);
-            const lowRef = Math.min(...windowData);
-
-            // 5. Distance from High %
-            const distHighPct = ((currentPrice - highRef) / highRef) * 100;
-
-            // 6. Fibonacci Position (Current Price relative to Window Range)
-            const range = highRef - lowRef;
-            const currentRetrace = (highRef - currentPrice) / range;
-            
-            let fibPos = "區間外";
-            // Check closeness to levels (within +/- 5% tolerance of range)
-            const tol = 0.05;
-            
-            if (currentPrice > highRef) fibPos = "創高";
-            else if (currentPrice < lowRef) fibPos = "破底";
-            else {
-                if (Math.abs(currentRetrace - 0.382) < tol) fibPos = "近 0.382";
-                else if (Math.abs(currentRetrace - 0.5) < tol) fibPos = "近 0.5";
-                else if (Math.abs(currentRetrace - 0.618) < tol) fibPos = "近 0.618";
-                else fibPos = `回檔 ${(currentRetrace*100).toFixed(0)}%`;
+            if (apexChartInstance) {
+                apexChartInstance.destroy();
             }
 
-            return {
-                price: currentPrice,
-                highRef: highRef,
-                distHighPct: distHighPct,
-                fibPos: fibPos
+            // Chart Configuration
+            const isIntraday = intervalType === '1d';
+            
+            let options = {
+                chart: {
+                    type: isIntraday ? 'line' : 'candlestick',
+                    height: 420,
+                    animations: { enabled: false },
+                    toolbar: { show: true }
+                },
+                series: [],
+                xaxis: {
+                    type: 'datetime',
+                    labels: {
+                        formatter: function(val, timestamp) {
+                            if (!timestamp) return val;
+                            const d = new Date(timestamp);
+                            if (intervalType === '1d' || intervalType === '5d') {
+                                return d.toLocaleTimeString('zh-TW', { timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false });
+                            } else {
+                                return d.toLocaleDateString('zh-TW', { timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit' });
+                            }
+                        }
+                    }
+                },
+                yaxis: {
+                    tooltip: { enabled: true }
+                },
+                tooltip: {
+                    x: {
+                        formatter: function(val) {
+                            return new Date(val).toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false });
+                        }
+                    }
+                },
+                stroke: { width: 1.5 },
+                plotOptions: {
+                    candlestick: {
+                        colors: {
+                            upward: '#ef4444', // Red for up (Taiwan style)
+                            downward: '#22c55e' // Green for down
+                        }
+                    }
+                }
             };
+
+            if (isIntraday) {
+                // Line Chart for Intraday
+                // Only Close Price
+                const lineData = ohlcData.map(d => ({ x: d.x, y: d.y[3] }));
+                options.series = [{ name: 'Price', data: lineData }];
+                options.stroke = { curve: 'straight', width: 2 };
+                options.colors = ['#2563eb'];
+            } else {
+                // Candlestick for others
+                options.series = [{ name: 'K-Line', data: ohlcData }];
+                
+                // Add MA (Moving Average)
+                const ma5 = calculateMA(ohlcData, 5);
+                const ma20 = calculateMA(ohlcData, 20);
+                
+                // Mixed chart (Candle + Line) requires correct series structure
+                // ApexCharts auto handles candlestick type in mixed series if defined
+                // But simplified: Just add lines overlay
+                
+                // Re-setup as combo chart
+                // Actually ApexCharts needs type: 'candlestick' on chart level generally
+                // But for mixed, we usually omit type on chart and specify in series
+                // Let's keep it simple: Just Candles for now to ensure stability, 
+                // or try to add MA lines if robust.
+                
+                // Adding MA Lines
+                // Note: Mixed charts in Apex require consistent x-axis.
+                options.series.push({ type: 'line', name: 'MA5', data: ma5 });
+                options.series.push({ type: 'line', name: 'MA20', data: ma20 });
+                
+                options.stroke = { width: [1, 1, 1] }; // Candle border, MA line width
+                options.colors = [null, '#f59e0b', '#8b5cf6']; // Candle colors handled by plotOptions, then MA colors
+            }
+
+            // Render
+            apexChartInstance = new ApexCharts(document.querySelector("#apexChart"), options);
+            apexChartInstance.render();
         }
 
-
+        function calculateMA(data, period) {
+            let ma = [];
+            for (let i = 0; i < data.length; i++) {
+                if (i < period - 1) {
+                    // ma.push({ x: data[i].x, y: null }); // Skip or null
+                    continue;
+                }
+                let sum = 0;
+                for (let j = 0; j < period; j++) {
+                    sum += data[i - j].y[3]; // Close price
+                }
+                ma.push({ x: data[i].x, y: sum / period });
+            }
+            return ma;
+        }
 
         // Init
         document.addEventListener('DOMContentLoaded', () => {
-            fetchLahosData();    // Pre-load Lahos
-            renderCompareTags(); // Setup Compare Tags
-            refreshCompareData();// Pre-load Compare
+            fetchLahosData();
+            renderCompareTags();
+            refreshCompareData();
         });
 
     </script>
 </body>
 </html>
-
