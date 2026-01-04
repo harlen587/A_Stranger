@@ -49,6 +49,10 @@
         .text-down { color: #26a69a; }
         .bg-up-soft { background-color: rgba(239, 83, 80, 0.15); }
         .bg-down-soft { background-color: rgba(38, 166, 154, 0.15); }
+        .sortable-th { cursor: pointer; user-select: none; transition: background 0.2s; }
+        .sortable-th:hover { background-color: #374151; }
+        .sort-icon { margin-left: 4px; color: #6b7280; font-size: 0.8em; }
+        .sort-icon.active { color: #f0b90b; }
         @media print {
             body { background-color: white; color: black; height: auto; overflow: visible; }
             #sidebar, .no-print, header, #addStockModal, .btn-primary, button { display: none !important; }
@@ -268,7 +272,7 @@
                     <div class="flex flex-wrap items-end gap-4">
                         <div class="flex-grow max-w-lg">
                             <label class="block text-xs text-gray-500 mb-1">比較標的 (逗號分隔)</label>
-                            <input type="text" id="compareInput" value="2330.TW, 8299.TWO, UPST, NVDA" class="input-dark w-full uppercase font-mono" placeholder="2330.TW, 0050.TW">
+                            <input type="text" id="compareInput" value="2330.TW, 8299.TWO, NVDA, UPST" class="input-dark w-full uppercase font-mono" placeholder="2330.TW, 0050.TW">
                         </div>
                         <div class="flex items-center mb-1">
                             <label for="adjToggle" class="flex items-center cursor-pointer relative">
@@ -291,16 +295,16 @@
                     <table id="perfTable" class="w-full text-left text-sm whitespace-nowrap hidden">
                         <thead class="bg-[#2b3139] text-gray-300">
                             <tr>
-                                <th class="p-3 rounded-l-lg">代碼</th>
-                                <th class="p-3">名稱</th>
-                                <th class="p-3 text-right">現價</th>
-                                <th class="p-3 text-right">近1日</th>
-                                <th class="p-3 text-right">近1週</th>
-                                <th class="p-3 text-right">近1月</th>
-                                <th class="p-3 text-right">近1季</th>
-                                <th class="p-3 text-right">近半年</th>
-                                <th class="p-3 text-right">近3年</th>
-                                <th class="p-3 text-right rounded-r-lg">近5年</th>
+                                <th class="p-3 rounded-l-lg sortable-th" onclick="sortPerf('symbol')">代碼 <i id="sort-symbol" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 sortable-th" onclick="sortPerf('name')">名稱 <i id="sort-name" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('price')">現價 <i id="sort-price" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_0')">近1日 <i id="sort-r_0" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_1')">近1週 <i id="sort-r_1" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_2')">近1月 <i id="sort-r_2" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_3')">近1季 <i id="sort-r_3" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_4')">近半年 <i id="sort-r_4" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right sortable-th" onclick="sortPerf('r_5')">近3年 <i id="sort-r_5" class="fa-solid fa-sort sort-icon"></i></th>
+                                <th class="p-3 text-right rounded-r-lg sortable-th" onclick="sortPerf('r_6')">近5年 <i id="sort-r_6" class="fa-solid fa-sort sort-icon"></i></th>
                             </tr>
                         </thead>
                         <tbody id="perfBody" class="divide-y divide-gray-800 text-gray-300 font-mono"></tbody>
@@ -474,6 +478,9 @@
     }
 
     // --- Performance Comparison ---
+    let perfData = [];
+    let perfSort = { key: null, dir: 'desc' };
+
     async function renderPerformanceView() {
         const input = document.getElementById('compareInput').value;
         const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
@@ -492,13 +499,13 @@
         loader.classList.remove('hidden');
         table.classList.add('hidden');
         tbody.innerHTML = '';
+        perfData = []; // Clear cache
 
         const periods = [
             { label: '1D', days: 2 }, { label: '1W', days: 6 }, { label: '1M', days: 22 },
             { label: '1Q', days: 65 }, { label: '6M', days: 130 }, { label: '3Y', days: 750 }, { label: '5Y', days: 1250 }
         ];
 
-        let html = '';
         for (let sym of symbols) {
             const data = await fetchFullHistory(sym);
             if (!data || data.length < 2) continue;
@@ -507,24 +514,89 @@
             const valKey = useAdj ? 'adjClose' : 'close';
             const currPrice = curr[valKey];
 
-            let rowHtml = `<td class="p-3 font-bold text-white">${sym}</td><td class="p-3 text-xs text-gray-400">${getStockName(sym)}</td><td class="p-3 text-right font-mono">${curr.close.toFixed(2)}</td>`;
+            // Build data object
+            let rowObj = {
+                symbol: sym,
+                name: getStockName(sym),
+                price: curr.close
+            };
 
-            for (let p of periods) {
+            for (let i = 0; i < periods.length; i++) {
+                let p = periods[i];
                 let pastIndex = data.length - p.days;
                 if (pastIndex < 0) pastIndex = 0;
+                
                 const past = data[pastIndex];
                 const pastPrice = past[valKey];
                 const ret = ((currPrice - pastPrice) / pastPrice) * 100;
-                const colorClass = ret >= 0 ? 'text-red-400' : 'text-green-400';
-                const bgClass = ret >= 0 ? 'bg-red-500/10' : 'bg-green-500/10';
-                rowHtml += `<td class="p-3 text-right font-mono ${colorClass} ${bgClass}">${ret > 0 ? '+' : ''}${ret.toFixed(2)}%</td>`;
+                rowObj[`r_${i}`] = ret;
             }
-            html += `<tr class="border-b border-gray-800 hover:bg-white/5 transition">${rowHtml}</tr>`;
+            perfData.push(rowObj);
         }
-        tbody.innerHTML = html;
+        
         loader.classList.add('hidden');
         table.classList.remove('hidden');
+        renderPerfTable();
     }
+
+    function sortPerf(key) {
+        if (perfSort.key === key) {
+            perfSort.dir = perfSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+            perfSort.key = key;
+            perfSort.dir = 'desc'; // Default desc for new column
+        }
+        renderPerfTable();
+    }
+
+    function renderPerfTable() {
+        const tbody = document.getElementById('perfBody');
+        
+        // Sort
+        if (perfSort.key) {
+            perfData.sort((a, b) => {
+                let valA = a[perfSort.key];
+                let valB = b[perfSort.key];
+                
+                // Handle string sort for symbol/name
+                if (typeof valA === 'string') {
+                    return perfSort.dir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+                }
+                
+                return perfSort.dir === 'asc' ? valA - valB : valB - valA;
+            });
+        }
+
+        // Update Icons
+        document.querySelectorAll('.sort-icon').forEach(i => {
+            i.className = 'fa-solid fa-sort sort-icon'; // Reset
+        });
+        if (perfSort.key) {
+            const icon = document.getElementById(`sort-${perfSort.key}`);
+            if(icon) {
+                icon.className = `fa-solid fa-sort-${perfSort.dir === 'asc' ? 'up' : 'down'} sort-icon active`;
+            }
+        }
+
+        // Generate HTML
+        let html = '';
+        for(let item of perfData) {
+            let tds = `<td class="p-3 font-bold text-white">${item.symbol}</td>
+                       <td class="p-3 text-xs text-gray-400">${item.name}</td>
+                       <td class="p-3 text-right font-mono">${item.price.toFixed(2)}</td>`;
+            
+            // Loop through r_0 to r_6
+            for(let i=0; i<7; i++) {
+                const val = item[`r_${i}`];
+                const colorClass = val >= 0 ? 'text-red-400' : 'text-green-400';
+                const bgClass = val >= 0 ? 'bg-red-500/10' : 'bg-green-500/10';
+                tds += `<td class="p-3 text-right font-mono ${colorClass} ${bgClass}">${val > 0 ? '+' : ''}${val.toFixed(2)}%</td>`;
+            }
+            html += `<tr class="border-b border-gray-800 hover:bg-white/5 transition">${tds}</tr>`;
+        }
+        tbody.innerHTML = html;
+    }
+
     document.getElementById('adjToggle').addEventListener('change', renderPerformanceView);
 
     // --- Dashboard & Indices ---
@@ -796,5 +868,3 @@
 </script>
 </body>
 </html>
-
-
