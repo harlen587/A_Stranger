@@ -3,70 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AlphaTrade 投資戰情中心</title>
+    <title>Hの投資戰情中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
-    <!-- SheetJS 用於 Excel 匯出 -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-statistics/7.8.0/simple-statistics.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background-color: #0b0e11; color: #eaecef; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; }
-        
-        /* 佈局樣式 */
         #sidebar { width: 240px; background-color: #161a1e; border-right: 1px solid #2b2f3a; flex-shrink: 0; display: flex; flex-direction: column; transition: transform 0.3s; z-index: 50; }
         #main-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; position: relative; background-color: #0b0e11; }
-        
-        /* Mobile Sidebar handling */
         @media (max-width: 768px) {
             #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
             #sidebar.open { transform: translateX(0); }
             .mobile-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 40; }
             .mobile-overlay.active { display: block; }
         }
-
-        /* 通用元件 */
         .card { background-color: #161a1e; border: 1px solid #2b2f3a; border-radius: 0.75rem; }
         .nav-item { padding: 12px 16px; display: flex; items-center; gap: 12px; color: #848e9c; cursor: pointer; transition: all 0.2s; border-radius: 8px; margin: 4px 8px; }
         .nav-item:hover, .nav-item.active { background-color: #2b3139; color: #f0b90b; }
         .nav-item.active i { color: #f0b90b; }
-        
         .btn-primary { background-color: #f0b90b; color: #000; font-weight: bold; padding: 6px 16px; border-radius: 6px; transition: transform 0.1s; }
         .btn-primary:hover { transform: scale(1.05); }
         .btn-primary:active { transform: scale(0.95); }
-
         .input-dark { background-color: #2b3139; border: 1px solid #474d57; color: white; padding: 6px 12px; border-radius: 6px; outline: none; transition: border-color 0.2s; }
         .input-dark:focus { border-color: #f0b90b; }
-
-        /* K線圖特定樣式 */
         .active-btn { background-color: #f0b90b !important; color: #000 !important; font-weight: bold; }
         .interval-btn { background-color: #2b3139; color: #848e9c; border: 1px solid transparent; min-width: 50px; }
         .interval-btn:hover { border-color: #f0b90b; color: #f0b90b; }
         .filter-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; border: 1px solid transparent; }
-        
-        /* Tab 按鈕樣式 (選股) */
         .tab-btn { padding: 8px 16px; border-bottom: 2px solid transparent; color: #848e9c; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
         .tab-btn.active { border-color: #3b82f6; color: #3b82f6; }
         .tag-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: bold; margin-right: 4px; }
         .tag-tech { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
         .tag-chip { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
         .tag-fund { background: rgba(16, 185, 129, 0.2); color: #34d399; }
-
-        /* 滾動條 */
+        .toggle-checkbox:checked { right: 0; border-color: #ef5350; }
+        .toggle-checkbox:checked + .toggle-label { background-color: #ef5350; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: #2b3139; border-radius: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
-
-        /* 動畫 */
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-        /* 漲跌顏色 (紅漲綠跌) */
         .text-up { color: #ef5350; }
         .text-down { color: #26a69a; }
         .bg-up-soft { background-color: rgba(239, 83, 80, 0.15); }
         .bg-down-soft { background-color: rgba(38, 166, 154, 0.15); }
-
-        /* 列印樣式 (PDF) */
         @media print {
             body { background-color: white; color: black; height: auto; overflow: visible; }
             #sidebar, .no-print, header, #addStockModal, .btn-primary, button { display: none !important; }
@@ -84,35 +66,25 @@
 </head>
 <body>
 
-    <!-- 手機版遮罩 -->
     <div id="mobileOverlay" class="mobile-overlay" onclick="toggleSidebar()"></div>
 
-    <!-- 側邊欄 -->
     <nav id="sidebar">
         <div class="p-6 flex items-center gap-3 border-b border-gray-800">
             <i class="fa-solid fa-layer-group text-yellow-500 text-2xl"></i>
             <div>
-                <h1 class="font-bold text-lg tracking-wider text-white">AlphaTrade</h1>
+                <h1 class="font-bold text-lg tracking-wider text-white">HのTrade</h1>
                 <p class="text-[10px] text-gray-500 uppercase tracking-widest">Pro Dashboard</p>
             </div>
         </div>
-
         <div class="flex-grow py-4 space-y-1">
             <div class="px-4 text-xs font-bold text-gray-500 mb-2 mt-2">主選單</div>
-            <div class="nav-item active" onclick="switchView('dashboard', this)">
-                <i class="fa-solid fa-chart-pie w-5"></i> 智能戰情室
-            </div>
-            <div class="nav-item" onclick="switchView('kline', this)">
-                <i class="fa-solid fa-chart-candlestick w-5"></i> K線大師
-            </div>
-            <div class="nav-item" onclick="switchView('screener', this)">
-                <i class="fa-solid fa-filter w-5"></i> 策略選股
-            </div>
-            <div class="nav-item" onclick="switchView('portfolio', this)">
-                <i class="fa-solid fa-wallet w-5"></i> 庫存損益
-            </div>
+            <div class="nav-item active" onclick="switchView('dashboard', this)"><i class="fa-solid fa-chart-pie w-5"></i> 智能戰情室</div>
+            <div class="nav-item" onclick="switchView('kline', this)"><i class="fa-solid fa-chart-candlestick w-5"></i> K線大師</div>
+            <div class="nav-item" onclick="switchView('lohas', this)"><i class="fa-solid fa-lines-leaning w-5"></i> 樂活五線譜</div>
+            <div class="nav-item" onclick="switchView('compare', this)"><i class="fa-solid fa-ranking-star w-5"></i> 績效超級比</div>
+            <div class="nav-item" onclick="switchView('screener', this)"><i class="fa-solid fa-filter w-5"></i> 策略選股</div>
+            <div class="nav-item" onclick="switchView('portfolio', this)"><i class="fa-solid fa-wallet w-5"></i> 庫存損益</div>
         </div>
-
         <div class="p-4 border-t border-gray-800">
             <div class="card p-3 bg-gradient-to-br from-yellow-500/10 to-transparent border-yellow-500/20">
                 <div class="flex justify-between items-center mb-2">
@@ -120,103 +92,48 @@
                     <button onclick="refreshWatchlist()" class="text-gray-400 hover:text-white"><i class="fa-solid fa-rotate text-xs"></i></button>
                 </div>
                 <div id="miniWatchlist" class="space-y-2 text-xs">
-                    <!-- 動態生成 -->
                     <div class="flex justify-between items-center"><span class="text-gray-400">載入中...</span></div>
                 </div>
             </div>
         </div>
     </nav>
 
-    <!-- 主要內容區 -->
     <main id="main-content" class="flex flex-col h-full relative">
-        <!-- 手機版 Header -->
         <header class="md:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-[#161a1e]">
             <button onclick="toggleSidebar()" class="text-gray-400"><i class="fa-solid fa-bars text-xl"></i></button>
-            <span class="font-bold text-yellow-500">AlphaTrade</span>
+            <span class="font-bold text-yellow-500">HのTrade</span>
             <div class="w-6"></div>
         </header>
 
-        <!-- View 1: 智能戰情室 (Dashboard) -->
+        <!-- View 1: 智能戰情室 -->
         <div id="view-dashboard" class="view-section p-4 md:p-8 space-y-6 fade-in overflow-y-auto">
-            <!-- 全球指數列表 (可橫向捲動) -->
-            <div class="flex overflow-x-auto gap-4 pb-2 no-scrollbar" id="globalIndicesRow">
-                <!-- 由 JS 動態生成 -->
-                <div class="card p-4 min-w-[160px] animate-pulse flex flex-col justify-center items-center">
-                    <div class="h-4 w-20 bg-gray-700 rounded mb-2"></div>
-                    <div class="h-6 w-16 bg-gray-700 rounded"></div>
-                </div>
-            </div>
-
-            <!-- Dashboard 主要指標區：調整 Grid 以容納 5 個項目 -->
+            <div class="flex overflow-x-auto gap-4 pb-2 no-scrollbar" id="globalIndicesRow"></div>
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-                <!-- 市場情緒 (台股) -->
                 <div class="card p-5 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-3 opacity-10"><i class="fa-solid fa-gauge-high text-6xl text-yellow-500"></i></div>
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-2">市場情緒 (台股)</h3>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-red-400">貪婪</span>
-                        <span class="text-xs text-gray-500">78/100</span>
-                    </div>
-                    <div class="w-full bg-gray-700 h-1.5 mt-3 rounded-full overflow-hidden">
-                        <!-- 台股邏輯：紅是熱/貪婪 -->
-                        <div class="bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 h-full w-[78%]"></div>
-                    </div>
-                    <p class="text-[10px] text-gray-500 mt-2">台股多頭氣盛</p>
+                    <div class="flex items-baseline gap-2"><span class="text-2xl font-bold text-red-400">貪婪</span><span class="text-xs text-gray-500">78/100</span></div>
+                    <div class="w-full bg-gray-700 h-1.5 mt-3 rounded-full overflow-hidden"><div class="bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 h-full w-[78%]"></div></div>
                 </div>
-
-                <!-- 新增：市場情緒 (美股) -->
                 <div class="card p-5 relative overflow-hidden">
-                    <div class="absolute top-0 right-0 p-3 opacity-10"><i class="fa-solid fa-scale-unbalanced text-6xl text-green-500"></i></div>
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-2">市場情緒 (美股)</h3>
-                    <div class="flex items-baseline gap-2">
-                        <span class="text-2xl font-bold text-green-400">貪婪</span>
-                        <span class="text-xs text-gray-500">65/100</span>
-                    </div>
-                    <div class="w-full bg-gray-700 h-1.5 mt-3 rounded-full overflow-hidden">
-                        <!-- 美股邏輯：綠是熱/貪婪 -->
-                        <div class="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-full w-[65%]"></div>
-                    </div>
-                    <p class="text-[10px] text-gray-500 mt-2">Fear & Greed Index (模擬)</p>
+                    <div class="flex items-baseline gap-2"><span class="text-2xl font-bold text-green-400">貪婪</span><span class="text-xs text-gray-500">65/100</span></div>
+                    <div class="w-full bg-gray-700 h-1.5 mt-3 rounded-full overflow-hidden"><div class="bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 h-full w-[65%]"></div></div>
                 </div>
-                
-                <!-- 大盤指數 (台股) -->
                 <div class="card p-5 relative">
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-2">加權指數 (TSE)</h3>
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <div id="idx-price-tse" class="text-2xl font-bold text-gray-300">Loading...</div>
-                            <div id="idx-change-tse" class="text-xs text-gray-500 flex items-center gap-1">--</div>
-                        </div>
-                        <div id="miniChartTSE" class="w-16 h-10"></div>
-                    </div>
+                    <div class="flex justify-between items-end"><div><div id="idx-price-tse" class="text-2xl font-bold text-gray-300">Loading...</div><div id="idx-change-tse" class="text-xs text-gray-500 flex items-center gap-1">--</div></div><div id="miniChartTSE" class="w-16 h-10"></div></div>
                 </div>
-
-                <!-- 櫃買指數 (台股) -->
                 <div class="card p-5 relative">
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-2">櫃買指數 (OTC)</h3>
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <div id="idx-price-otc" class="text-2xl font-bold text-gray-300">Loading...</div>
-                            <div id="idx-change-otc" class="text-xs text-gray-500 flex items-center gap-1">--</div>
-                        </div>
-                        <div id="miniChartOTC" class="w-16 h-10"></div>
-                    </div>
+                    <div class="flex justify-between items-end"><div><div id="idx-price-otc" class="text-2xl font-bold text-gray-300">Loading...</div><div id="idx-change-otc" class="text-xs text-gray-500 flex items-center gap-1">--</div></div><div id="miniChartOTC" class="w-16 h-10"></div></div>
                 </div>
-
-                <!-- 台指期 (Futures) -->
                 <div class="card p-5 relative">
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-2">台指期 (TXF)</h3>
-                    <div class="flex justify-between items-end">
-                        <div>
-                            <div id="idx-price-txf" class="text-2xl font-bold text-gray-300">Loading...</div>
-                            <div id="idx-change-txf" class="text-xs text-gray-500 flex items-center gap-1">--</div>
-                        </div>
-                        <div id="miniChartTXF" class="w-16 h-10"></div>
-                    </div>
+                    <div class="flex justify-between items-end"><div><div id="idx-price-txf" class="text-2xl font-bold text-gray-300">Loading...</div><div id="idx-change-txf" class="text-xs text-gray-500 flex items-center gap-1">--</div></div><div id="miniChartTXF" class="w-16 h-10"></div></div>
                 </div>
             </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
                 <!-- 類股熱力圖 (模擬) -->
                 <div class="card p-5 h-[350px] flex flex-col">
                     <h3 class="text-gray-400 text-sm font-bold uppercase mb-4 flex justify-between">
@@ -273,269 +190,151 @@
             </div>
         </div>
 
-        <!-- View 2: K線大師 (不變) -->
+        <!-- View 2: K線大師 -->
         <div id="view-kline" class="view-section hidden flex flex-col h-full p-2 md:p-4 space-y-3">
              <div class="card p-3 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-2xl shrink-0">
                 <div class="flex items-center gap-3">
                     <h1 class="text-lg font-bold tracking-tight hidden md:block">K線大師 <span class="text-yellow-500 text-[10px] bg-yellow-500/10 px-2 py-0.5 rounded ml-2">PRO</span></h1>
-                    
                     <div class="flex gap-2 ml-0 md:ml-4">
-                        <select id="marketType" class="bg-[#2b3139] text-white p-2 rounded-lg text-sm outline-none focus:ring-2 focus:ring-yellow-500 border border-gray-700 cursor-pointer">
-                            <option value="TW">台股上市</option>
-                            <option value="TWO">台股上櫃</option>
-                            <option value="US">美股</option>
-                        </select>
-                        <input type="text" id="stockInput" value="2330" placeholder="代碼" class="bg-[#2b3139] text-white p-2 rounded-lg w-24 text-sm outline-none focus:ring-2 focus:ring-yellow-500 uppercase font-mono border border-gray-700">
+                        <select id="marketType" class="bg-[#2b3139] text-white p-2 rounded-lg text-sm outline-none border border-gray-700"><option value="TW">台股上市</option><option value="TWO">台股上櫃</option><option value="US">美股</option></select>
+                        <input type="text" id="stockInput" value="2330" placeholder="代碼" class="bg-[#2b3139] text-white p-2 rounded-lg w-24 text-sm outline-none uppercase font-mono border border-gray-700">
                         <button onclick="main()" class="btn-primary text-sm whitespace-nowrap">分析</button>
                     </div>
                 </div>
-                
                 <div id="intervalGroup" class="flex gap-1 bg-[#0b0e11] p-1 rounded-lg overflow-x-auto no-scrollbar">
-                    <button onclick="changeInterval('1d', '1y', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs transition-all whitespace-nowrap active-btn">日線</button>
-                    <button onclick="changeInterval('1wk', '3y', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs transition-all whitespace-nowrap">週線</button>
-                    <button onclick="changeInterval('1mo', 'max', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs transition-all whitespace-nowrap">月線</button>
+                    <button onclick="changeInterval('1d', '1y', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs active-btn">日線</button>
+                    <button onclick="changeInterval('1wk', '3y', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs">週線</button>
+                    <button onclick="changeInterval('1mo', 'max', this)" class="interval-btn px-3 py-1.5 rounded-md text-xs">月線</button>
                 </div>
             </div>
-
             <div id="chart-zone" class="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-grow min-h-0">
                 <div class="card p-4 rounded-xl flex flex-col space-y-3 border-t-4 border-yellow-500 shadow-xl overflow-hidden order-2 lg:order-1 h-full">
                     <div class="shrink-0 space-y-3">
-                        <div class="flex justify-between items-center">
-                            <h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider">型態偵測器</h3>
-                            <span id="matchCount" class="bg-yellow-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">0</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-2">
-                            <button onclick="toggleAllFilters(true)" class="filter-btn bg-white/5 text-white hover:bg-white/10">全選</button>
-                            <button onclick="toggleAllFilters(false)" class="filter-btn bg-white/5 text-white hover:bg-white/10">清空</button>
-                        </div>
+                        <div class="flex justify-between items-center"><h3 class="font-bold text-gray-400 text-xs uppercase tracking-wider">型態偵測器</h3><span id="matchCount" class="bg-yellow-500 text-black text-[10px] font-bold px-2 py-0.5 rounded-full">0</span></div>
+                        <div class="grid grid-cols-2 gap-2"><button onclick="toggleAllFilters(true)" class="filter-btn bg-white/5 text-white hover:bg-white/10">全選</button><button onclick="toggleAllFilters(false)" class="filter-btn bg-white/5 text-white hover:bg-white/10">清空</button></div>
                     </div>
                     <hr class="border-gray-800 shrink-0">
                     <div id="filterContainer" class="flex-grow overflow-y-auto pr-1 space-y-1"></div>
                 </div>
-
                 <div class="lg:col-span-3 flex flex-col space-y-3 min-h-0 order-1 lg:order-2 h-full">
                     <div class="card p-2 rounded-xl relative flex-grow shadow-2xl overflow-hidden flex flex-col">
-                        <div id="loader" class="hidden absolute inset-0 bg-[#0b1118]/90 z-50 flex-col justify-center items-center">
-                            <div class="spinner border-4 border-[#2b2f3a] border-t-yellow-500 rounded-full w-10 h-10 animate-spin mb-4"></div>
-                            <div class="text-yellow-500 text-sm font-bold animate-pulse">數據分析中...</div>
-                        </div>
+                        <div id="loader" class="hidden absolute inset-0 bg-[#0b1118]/90 z-50 flex-col justify-center items-center"><div class="spinner border-4 border-[#2b2f3a] border-t-yellow-500 rounded-full w-10 h-10 animate-spin mb-4"></div><div class="text-yellow-500 text-sm font-bold animate-pulse">數據分析中...</div></div>
                         <div id="chart" class="w-full flex-grow"></div>
                     </div>
-
                     <div id="infoPanel" class="card p-4 rounded-xl border-l-8 border-yellow-500 shadow-lg bg-[#1c2127] shrink-0 h-[100px] flex flex-col justify-center">
-                        <h4 id="pTitle" class="font-bold text-yellow-500 text-base flex items-center gap-2">
-                            <i class="fa-solid fa-crosshairs"></i> 實戰指引面版
-                        </h4>
-                        <p id="pDesc" class="text-gray-400 text-xs mt-1 leading-relaxed line-clamp-2">
-                            請將滑鼠移動至圖表中有「型態標籤」的 K 線位置。
-                        </p>
+                        <h4 id="pTitle" class="font-bold text-yellow-500 text-base flex items-center gap-2"><i class="fa-solid fa-crosshairs"></i> 實戰指引面版</h4>
+                        <p id="pDesc" class="text-gray-400 text-xs mt-1 leading-relaxed line-clamp-2">請將滑鼠移動至圖表中有「型態標籤」的 K 線位置。</p>
                     </div>
                 </div>
             </div>
         </div>
 
-        <!-- View 3: 策略選股 (Screener) 大改版 -->
-        <div id="view-screener" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
-            <div class="card border-t-4 border-blue-500">
+        <!-- View 5: 樂活五線譜 -->
+        <div id="view-lohas" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
+            <div class="card border-t-4 border-orange-500 h-full flex flex-col">
+                <div class="p-4 border-b border-gray-800 flex flex-wrap gap-4 items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-lines-leaning text-orange-500"></i> 樂活五線譜 + 布林通道</h2>
+                    </div>
+                    <div class="flex gap-2">
+                        <input type="text" id="lohasInput" value="2330.TW" class="input-dark uppercase font-mono w-32" placeholder="代碼">
+                        <button onclick="renderLohasView()" class="btn-primary text-sm">分析</button>
+                    </div>
+                </div>
+                <div class="flex-grow p-4 relative">
+                    <div id="lohasLoader" class="hidden absolute inset-0 bg-[#0b1118]/90 z-50 flex-col justify-center items-center">
+                        <div class="spinner border-4 border-orange-500 rounded-full w-10 h-10 animate-spin mb-4"></div>
+                        <div class="text-orange-500 text-sm font-bold">計算回歸趨勢中...</div>
+                    </div>
+                    <div id="lohasChart" class="w-full h-full"></div>
+                </div>
+                <div class="p-4 bg-[#161a1e] border-t border-gray-800 text-xs text-gray-400 grid grid-cols-2 md:grid-cols-5 gap-2 text-center">
+                    <div><span class="w-3 h-3 inline-block bg-purple-500 rounded-full mr-1"></span>樂觀線 (TL+2SD)</div>
+                    <div><span class="w-3 h-3 inline-block bg-blue-400 rounded-full mr-1"></span>相對樂觀 (TL+1SD)</div>
+                    <div><span class="w-3 h-3 inline-block bg-white rounded-full mr-1"></span>趨勢線 (TL)</div>
+                    <div><span class="w-3 h-3 inline-block bg-blue-400 rounded-full mr-1"></span>相對悲觀 (TL-1SD)</div>
+                    <div><span class="w-3 h-3 inline-block bg-green-500 rounded-full mr-1"></span>悲觀線 (TL-2SD)</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- View 6: 績效超級比 -->
+        <div id="view-compare" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
+            <div class="card border-t-4 border-blue-400 h-full flex flex-col">
                 <div class="p-6 border-b border-gray-800">
                     <h2 class="text-xl font-bold mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-filter text-blue-500"></i> 全方位策略選股
+                        <i class="fa-solid fa-ranking-star text-blue-400"></i> 績效超級比一比
                     </h2>
-                    
-                    <!-- 分頁按鈕 -->
-                    <div class="flex gap-2 border-b border-gray-700 mb-6">
-                        <button onclick="switchScreenerTab('preset')" id="tab-preset" class="tab-btn active">快速策略</button>
-                        <button onclick="switchScreenerTab('custom')" id="tab-custom" class="tab-btn">自訂條件</button>
-                    </div>
-
-                    <!-- 快速策略區 -->
-                    <div id="screener-preset" class="flex flex-wrap gap-4 items-end">
-                        <div>
-                            <label class="block text-xs text-gray-500 mb-1">分析面向</label>
-                            <select id="strategyCategory" class="input-dark min-w-[150px]" onchange="updateStrategyOptions()">
-                                <option value="tech">技術分析 (Technical)</option>
-                                <option value="chip">籌碼分析 (Chips)</option>
-                                <option value="fund">基本面 (Fundamental)</option>
-                            </select>
+                    <div class="flex flex-wrap items-end gap-4">
+                        <div class="flex-grow max-w-lg">
+                            <label class="block text-xs text-gray-500 mb-1">比較標的 (逗號分隔)</label>
+                            <input type="text" id="compareInput" value="2330.TW, 0050.TW, 0056.TW, 2317.TW" class="input-dark w-full uppercase font-mono" placeholder="2330.TW, 0050.TW">
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-500 mb-1">選擇策略</label>
-                            <select id="strategySelect" class="input-dark min-w-[240px]">
-                                <!-- 由 JS 動態生成 -->
-                            </select>
+                        <div class="flex items-center mb-1">
+                            <label for="adjToggle" class="flex items-center cursor-pointer relative">
+                                <input type="checkbox" id="adjToggle" class="sr-only" checked>
+                                <div class="w-11 h-6 bg-gray-700 rounded-full border border-gray-600 toggle-bg transition"></div>
+                                <span class="ml-3 text-sm font-bold text-gray-300" id="adjLabel">含息 (Total Return)</span>
+                                <div class="w-5 h-5 bg-white rounded-full absolute left-0.5 top-0.5 transition transform" id="toggleDot" style="transform: translateX(100%);"></div>
+                            </label>
                         </div>
-                        <div>
-                            <label class="block text-xs text-gray-500 mb-1">掃描範圍</label>
-                            <select id="scanScope" class="input-dark">
-                                <option value="tw_se">台股上市 (TWSE)</option>
-                                <option value="tw_otc">台股上櫃 (TPEx)</option>
-                                <option value="us_dji">道瓊成分股 (DJI)</option>
-                                <option value="us_sp500">標普500 (S&P 500)</option>
-                                <option value="us_nasdaq">那斯達克 (Nasdaq)</option>
-                            </select>
-                        </div>
-                        <button onclick="runScreener()" class="btn-primary bg-blue-500 hover:bg-blue-400 text-white border-none">
-                            <i class="fa-solid fa-play mr-1"></i> 開始掃描
-                        </button>
-                    </div>
-
-                    <!-- 自訂條件區 (Custom Builder) -->
-                    <div id="screener-custom" class="hidden space-y-4">
-                        <div class="flex flex-wrap items-end gap-2 p-3 bg-gray-800/50 rounded-lg">
-                            <div class="flex-1 min-w-[150px]">
-                                <label class="text-xs text-gray-400">指標</label>
-                                <select id="customMetric" class="input-dark w-full text-sm">
-                                    <option value="pe">本益比 (PE Ratio)</option>
-                                    <option value="yield">殖利率 (Yield)</option>
-                                    <option value="rsi">RSI (14)</option>
-                                    <option value="ma_diff">股價與均線乖離 (%)</option>
-                                    <option value="foreign_buy">外資連續買超天數</option>
-                                </select>
-                            </div>
-                            <div class="w-[80px]">
-                                <label class="text-xs text-gray-400">判斷</label>
-                                <select id="customOp" class="input-dark w-full text-sm">
-                                    <option value="gt">&gt; (大於)</option>
-                                    <option value="lt">&lt; (小於)</option>
-                                </select>
-                            </div>
-                            <div class="w-[100px]">
-                                <label class="text-xs text-gray-400">數值</label>
-                                <input type="number" id="customVal" class="input-dark w-full text-sm" placeholder="15">
-                            </div>
-                            <button onclick="addCondition()" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1.5 rounded text-sm"><i class="fa-solid fa-plus"></i></button>
-                        </div>
-
-                        <!-- 已選條件列表 -->
-                        <div id="conditionList" class="flex flex-wrap gap-2 min-h-[40px]">
-                            <!-- JS 生成 -->
-                        </div>
-                        
-                        <div class="flex justify-end">
-                            <button onclick="runCustomScreener()" class="btn-primary bg-purple-500 hover:bg-purple-400 text-white border-none">
-                                <i class="fa-solid fa-rocket mr-1"></i> 執行自訂篩選
-                            </button>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 結果區 -->
-                <div class="bg-[#0b0e11] p-4 min-h-[300px]">
-                    <div id="screenerStatus" class="text-gray-500 text-center py-10">
-                        <i class="fa-solid fa-microchip text-4xl mb-3 opacity-30"></i>
-                        <p>請選擇策略並點擊「開始掃描」</p>
-                        <p class="text-xs mt-2 text-gray-600">系統將即時抓取成分股數據進行運算</p>
-                    </div>
-                    <table id="screenerResults" class="w-full text-left text-sm hidden">
-                        <thead class="text-gray-400 border-b border-gray-800">
-                            <tr>
-                                <th class="py-2 pl-2">代碼</th>
-                                <th class="py-2">名稱</th>
-                                <th class="py-2 text-right">現價</th>
-                                <th class="py-2 text-center">類型</th>
-                                <th class="py-2 text-right">訊號數值</th>
-                                <th class="py-2 text-right pr-2">分析說明</th>
-                            </tr>
-                        </thead>
-                        <tbody id="screenerBody" class="divide-y divide-gray-800"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-
-        <!-- View 4: 庫存損益 (Portfolio) -->
-        <div id="view-portfolio" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div class="card p-4 border-l-4 border-purple-500">
-                    <h3 class="text-xs text-gray-500 uppercase">總投入成本</h3>
-                    <div id="totalCost" class="text-2xl font-bold mt-1">$0</div>
-                </div>
-                <div class="card p-4 border-l-4 border-yellow-500">
-                    <h3 class="text-xs text-gray-500 uppercase">總市值</h3>
-                    <div id="totalValue" class="text-2xl font-bold mt-1">$0</div>
-                </div>
-                <div class="card p-4 border-l-4 border-green-500">
-                    <h3 class="text-xs text-gray-500 uppercase">未實現損益</h3>
-                    <div id="totalPnL" class="text-2xl font-bold mt-1 text-gray-400">$0 (0%)</div>
-                </div>
-            </div>
-
-            <div class="card p-6">
-                <div class="flex justify-between items-center mb-4">
-                    <h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-wallet text-purple-500"></i> 持倉明細</h2>
-                    <div class="flex gap-2">
-                        <!-- 新增按鈕：匯出 -->
-                        <button onclick="exportToExcel()" class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-500 text-xs no-print">
-                            <i class="fa-solid fa-file-excel mr-1"></i> 匯出 Excel
-                        </button>
-                        <button onclick="window.print()" class="bg-gray-600 text-white px-3 py-1.5 rounded hover:bg-gray-500 text-xs no-print">
-                            <i class="fa-solid fa-print mr-1"></i> 列印 / 存為 PDF
-                        </button>
-                        <button onclick="document.getElementById('addStockModal').style.display='flex'" class="btn-primary bg-purple-500 text-white border-none hover:bg-purple-400 text-xs no-print">
-                            <i class="fa-solid fa-plus"></i> 新增持股
+                        <button onclick="renderPerformanceView()" class="btn-primary bg-blue-500 hover:bg-blue-400 text-white border-none">
+                            <i class="fa-solid fa-play mr-1"></i> 開始比較
                         </button>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left text-sm whitespace-nowrap">
+                <div class="flex-grow p-6 overflow-auto">
+                    <div id="perfLoader" class="hidden flex flex-col justify-center items-center py-20">
+                        <div class="spinner border-4 border-blue-400 rounded-full w-10 h-10 animate-spin mb-4"></div>
+                        <div class="text-blue-400 text-sm">正在抓取歷史數據與除權息資料...</div>
+                    </div>
+                    <table id="perfTable" class="w-full text-left text-sm whitespace-nowrap hidden">
                         <thead class="bg-[#2b3139] text-gray-300">
                             <tr>
                                 <th class="p-3 rounded-l-lg">代碼</th>
-                                <th class="p-3">股數</th>
-                                <th class="p-3">平均成本</th>
-                                <th class="p-3">現價</th>
-                                <th class="p-3">現值</th>
-                                <th class="p-3">損益 ($)</th>
-                                <th class="p-3">損益 (%)</th>
-                                <th class="p-3 rounded-r-lg text-right no-print">動作</th>
+                                <th class="p-3">名稱</th>
+                                <th class="p-3 text-right">現價</th>
+                                <th class="p-3 text-right">近1日</th>
+                                <th class="p-3 text-right">近1週</th>
+                                <th class="p-3 text-right">近1月</th>
+                                <th class="p-3 text-right">近1季</th>
+                                <th class="p-3 text-right">近半年</th>
+                                <th class="p-3 text-right">近3年</th>
+                                <th class="p-3 text-right rounded-r-lg">近5年</th>
                             </tr>
                         </thead>
-                        <tbody id="portfolioBody" class="divide-y divide-gray-800 text-gray-300">
-                            <tr><td colspan="8" class="text-center py-8 text-gray-500">尚無庫存資料，請點擊新增。</td></tr>
-                        </tbody>
+                        <tbody id="perfBody" class="divide-y divide-gray-800 text-gray-300 font-mono"></tbody>
                     </table>
                 </div>
             </div>
         </div>
+
+        <!-- View 3: 策略選股 -->
+        <div id="view-screener" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
+            <div class="card border-t-4 border-blue-500"><div class="p-6 border-b border-gray-800"><h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-filter text-blue-500"></i> 全方位策略選股</h2><div class="flex gap-2 border-b border-gray-700 mb-6"><button onclick="switchScreenerTab('preset')" id="tab-preset" class="tab-btn active">快速策略</button><button onclick="switchScreenerTab('custom')" id="tab-custom" class="tab-btn">自訂條件</button></div><div id="screener-preset" class="flex flex-wrap gap-4 items-end"><div><label class="block text-xs text-gray-500 mb-1">分析面向</label><select id="strategyCategory" class="input-dark min-w-[150px]" onchange="updateStrategyOptions()"><option value="tech">技術分析 (Technical)</option><option value="chip">籌碼分析 (Chips)</option><option value="fund">基本面 (Fundamental)</option></select></div><div><label class="block text-xs text-gray-500 mb-1">選擇策略</label><select id="strategySelect" class="input-dark min-w-[240px]"></select></div><div><label class="block text-xs text-gray-500 mb-1">掃描範圍</label><select id="scanScope" class="input-dark"><option value="tw_se">台股上市 (TWSE)</option><option value="tw_otc">台股上櫃 (TPEx)</option><option value="us_dji">道瓊成分股 (DJI)</option><option value="us_sp500">標普500 (S&P 500)</option><option value="us_nasdaq">那斯達克 (Nasdaq)</option></select></div><button onclick="runScreener()" class="btn-primary bg-blue-500 hover:bg-blue-400 text-white border-none"><i class="fa-solid fa-play mr-1"></i> 開始掃描</button></div><div id="screener-custom" class="hidden space-y-4"><div class="flex flex-wrap items-end gap-2 p-3 bg-gray-800/50 rounded-lg"><div class="flex-1 min-w-[150px]"><label class="text-xs text-gray-400">指標</label><select id="customMetric" class="input-dark w-full text-sm"><option value="pe">本益比 (PE Ratio)</option><option value="yield">殖利率 (Yield)</option><option value="rsi">RSI (14)</option><option value="ma_diff">股價與均線乖離 (%)</option><option value="foreign_buy">外資連續買超天數</option></select></div><div class="w-[80px]"><label class="text-xs text-gray-400">判斷</label><select id="customOp" class="input-dark w-full text-sm"><option value="gt">&gt; (大於)</option><option value="lt">&lt; (小於)</option></select></div><div class="w-[100px]"><label class="text-xs text-gray-400">數值</label><input type="number" id="customVal" class="input-dark w-full text-sm" placeholder="15"></div><button onclick="addCondition()" class="bg-gray-600 hover:bg-gray-500 text-white px-3 py-1.5 rounded text-sm"><i class="fa-solid fa-plus"></i></button></div><div id="conditionList" class="flex flex-wrap gap-2 min-h-[40px]"></div><div class="flex justify-end"><button onclick="runCustomScreener()" class="btn-primary bg-purple-500 hover:bg-purple-400 text-white border-none"><i class="fa-solid fa-rocket mr-1"></i> 執行自訂篩選</button></div></div></div><div class="bg-[#0b0e11] p-4 min-h-[300px]"><div id="screenerStatus" class="text-gray-500 text-center py-10"><i class="fa-solid fa-microchip text-4xl mb-3 opacity-30"></i><p>請選擇策略並點擊「開始掃描」</p><p class="text-xs mt-2 text-gray-600">系統將即時抓取成分股數據進行運算</p></div><table id="screenerResults" class="w-full text-left text-sm hidden"><thead class="text-gray-400 border-b border-gray-800"><tr><th class="py-2 pl-2">代碼</th><th class="py-2">名稱</th><th class="py-2 text-right">現價</th><th class="py-2 text-center">類型</th><th class="py-2 text-right">訊號數值</th><th class="py-2 text-right pr-2">分析說明</th></tr></thead><tbody id="screenerBody" class="divide-y divide-gray-800"></tbody></table></div></div>
+        </div>
+
+        <!-- View 4: 庫存損益 -->
+        <div id="view-portfolio" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6"><div class="card p-4 border-l-4 border-purple-500"><h3 class="text-xs text-gray-500 uppercase">總投入成本</h3><div id="totalCost" class="text-2xl font-bold mt-1">$0</div></div><div class="card p-4 border-l-4 border-yellow-500"><h3 class="text-xs text-gray-500 uppercase">總市值</h3><div id="totalValue" class="text-2xl font-bold mt-1">$0</div></div><div class="card p-4 border-l-4 border-green-500"><h3 class="text-xs text-gray-500 uppercase">未實現損益</h3><div id="totalPnL" class="text-2xl font-bold mt-1 text-gray-400">$0 (0%)</div></div></div><div class="card p-6"><div class="flex justify-between items-center mb-4"><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-wallet text-purple-500"></i> 持倉明細</h2><div class="flex gap-2"><button onclick="exportToExcel()" class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-500 text-xs no-print"><i class="fa-solid fa-file-excel mr-1"></i> 匯出 Excel</button><button onclick="window.print()" class="bg-gray-600 text-white px-3 py-1.5 rounded hover:bg-gray-500 text-xs no-print"><i class="fa-solid fa-print mr-1"></i> 列印 / 存為 PDF</button><button onclick="document.getElementById('addStockModal').style.display='flex'" class="btn-primary bg-purple-500 text-white border-none hover:bg-purple-400 text-xs no-print"><i class="fa-solid fa-plus"></i> 新增持股</button></div></div><div class="overflow-x-auto"><table class="w-full text-left text-sm whitespace-nowrap"><thead class="bg-[#2b3139] text-gray-300"><tr><th class="p-3 rounded-l-lg">代碼</th><th class="p-3">股數</th><th class="p-3">平均成本</th><th class="p-3">現價</th><th class="p-3">現值</th><th class="p-3">損益 ($)</th><th class="p-3">損益 (%)</th><th class="p-3 rounded-r-lg text-right no-print">動作</th></tr></thead><tbody id="portfolioBody" class="divide-y divide-gray-800 text-gray-300"><tr><td colspan="8" class="text-center py-8 text-gray-500">尚無庫存資料，請點擊新增。</td></tr></tbody></table></div></div>
+        </div>
     </main>
 
-    <!-- Modal: 新增持股 -->
     <div id="addStockModal" class="fixed inset-0 bg-black/80 z-[100] hidden justify-center items-center fade-in">
-        <div class="card w-full max-w-sm p-6 relative shadow-2xl border-purple-500 border">
-            <h3 class="text-lg font-bold mb-4 text-white">新增持倉紀錄</h3>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">股票代碼 (例: 2330.TW)</label>
-                    <input type="text" id="pf_symbol" class="input-dark w-full uppercase" placeholder="2330.TW">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">持有股數</label>
-                    <input type="number" id="pf_qty" class="input-dark w-full" placeholder="1000">
-                </div>
-                <div>
-                    <label class="block text-xs text-gray-500 mb-1">平均成本</label>
-                    <input type="number" id="pf_cost" class="input-dark w-full" placeholder="500.0">
-                </div>
-                <div class="flex gap-2 pt-2">
-                    <button onclick="addPortfolioItem()" class="flex-1 btn-primary bg-purple-600 text-white hover:bg-purple-500 border-none">儲存</button>
-                    <button onclick="document.getElementById('addStockModal').style.display='none'" class="flex-1 bg-gray-700 text-white py-2 rounded hover:bg-gray-600">取消</button>
-                </div>
-            </div>
-        </div>
+        <div class="card w-full max-w-sm p-6 relative shadow-2xl border-purple-500 border"><h3 class="text-lg font-bold mb-4 text-white">新增持倉紀錄</h3><div class="space-y-4"><div><label class="block text-xs text-gray-500 mb-1">股票代碼 (例: 2330.TW)</label><input type="text" id="pf_symbol" class="input-dark w-full uppercase" placeholder="2330.TW"></div><div><label class="block text-xs text-gray-500 mb-1">持有股數</label><input type="number" id="pf_qty" class="input-dark w-full" placeholder="1000"></div><div><label class="block text-xs text-gray-500 mb-1">平均成本</label><input type="number" id="pf_cost" class="input-dark w-full" placeholder="500.0"></div><div class="flex gap-2 pt-2"><button onclick="addPortfolioItem()" class="flex-1 btn-primary bg-purple-600 text-white hover:bg-purple-500 border-none">儲存</button><button onclick="document.getElementById('addStockModal').style.display='none'" class="flex-1 bg-gray-700 text-white py-2 rounded hover:bg-gray-600">取消</button></div></div></div>
     </div>
 
 <script>
-    // --- 共用與設定 ---
-    const COLORS = {
-        up: '#ef5350', down: '#26a69a',
-        bullText: '#f87171', bullBg: '#450a0a',
-        bearText: '#34d399', bearBg: '#064e3b',
-        neutral: '#9ca3af'
-    };
-    const PROXIES = ["https://corsproxy.io/?", "https://api.allorigins.win/raw?url="];
+    const COLORS = { up: '#ef5350', down: '#26a69a', bullText: '#f87171', bullBg: '#450a0a', bearText: '#34d399', bearBg: '#064e3b', neutral: '#9ca3af' };
+    // Expanded Proxy List for Reliability
+    const PROXIES = [
+        "https://api.codetabs.com/v1/proxy?quest=",
+        "https://corsproxy.io/?",
+        "https://api.allorigins.win/raw?url="
+    ];
     let activeView = 'dashboard';
+    let lohasChartInstance = null;
 
-    // --- 導航與視圖切換 ---
     function switchView(viewId, btn) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
         document.getElementById('view-' + viewId).classList.remove('hidden');
@@ -543,148 +342,215 @@
         if(btn) btn.classList.add('active');
         activeView = viewId;
 
-        // View Specific Logic
-        if (viewId === 'dashboard') {
-            updateDashboardTable();
-            updateGlobalIndices(); // 更新全球指數
-            updateLocalIndices(); // 新增: 更新台股指數
-        }
-        if (viewId === 'portfolio') {
-            initPortfolio(); // 初始化並讀取庫存 (僅 LocalStorage)
-        }
+        if (viewId === 'dashboard') { updateDashboardTable(); updateGlobalIndices(); updateLocalIndices(); }
+        if (viewId === 'portfolio') initPortfolio();
         if (viewId === 'kline') setTimeout(() => { if(!chartInstance) main(); else chartInstance.render(); }, 100);
-        if (viewId === 'screener') updateStrategyOptions(); // Init Screener
-
-        // Mobile close
+        if (viewId === 'screener') updateStrategyOptions();
+        if (viewId === 'lohas') renderLohasView(); 
+        
         if (window.innerWidth < 768) toggleSidebar();
     }
+    function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('mobileOverlay').classList.toggle('active'); }
 
-    function toggleSidebar() {
-        const sb = document.getElementById('sidebar');
-        const ov = document.getElementById('mobileOverlay');
-        sb.classList.toggle('open');
-        ov.classList.toggle('active');
-    }
-
-    // --- 共用 API 函數 ---
+    // --- Core API: Robust Data Fetching (Range 5d to avoid "No Data" errors) ---
     async function getStockPrice(symbol) {
-        // Mode: Public CORS Proxy
-        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=1d&interval=1d`;
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=5d&interval=1d`;
         for (let proxy of PROXIES) {
             try {
                 const res = await fetch(proxy + encodeURIComponent(url));
                 const json = await res.json();
-                const meta = json.chart.result[0].meta;
-                return {
-                    price: meta.regularMarketPrice,
-                    prevClose: meta.chartPreviousClose,
-                    symbol: symbol
+                if (!json.chart || !json.chart.result) continue;
+                
+                const result = json.chart.result[0];
+                const meta = result.meta;
+                const quote = result.indicators.quote[0];
+                
+                // Robust price extraction: prioritize meta, fallback to last closed candle
+                let price = meta.regularMarketPrice;
+                if (!price && quote.close) {
+                    const validCloses = quote.close.filter(c => c != null);
+                    if (validCloses.length > 0) price = validCloses[validCloses.length - 1];
+                }
+
+                return { 
+                    price: price, 
+                    prevClose: meta.chartPreviousClose || price, 
+                    symbol: symbol 
                 };
-            } catch (e) { console.log(e); }
+            } catch (e) { console.warn(`Proxy ${proxy} failed for ${symbol}`, e); }
         }
         return null;
     }
 
-    // --- 模組 1: 智能戰情室 ---
-    const WATCH_LIST = ['2330.TW', '2454.TW', '2317.TW', 'NVDA', 'AAPL', 'AMD', 'TSLA'];
-    const GLOBAL_INDICES = [
-        { sym: '^DJI', name: '道瓊工業' },
-        { sym: '^GSPC', name: 'S&P 500' },
-        { sym: '^IXIC', name: 'Nasdaq' },
-        { sym: '^N225', name: '日經 225' },
-        { sym: '000001.SS', name: '上證指數' }, 
-        { sym: '^HSI', name: '恆生指數' }
-    ];
+    // --- Helper: Fetch Full History for Calc (Lohas & Perf) ---
+    async function fetchFullHistory(symbol, useAdj = false) {
+        const url = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=5y&interval=1d`;
+        for (let proxy of PROXIES) {
+            try {
+                const res = await fetch(proxy + encodeURIComponent(url));
+                const json = await res.json();
+                if (!json.chart.result) continue;
+                const r = json.chart.result[0];
+                const q = r.indicators.quote[0];
+                const adj = r.indicators.adjclose ? r.indicators.adjclose[0].adjclose : q.close;
+                
+                return r.timestamp.map((t, i) => ({
+                    date: new Date(t * 1000),
+                    close: q.close[i],
+                    adjClose: adj[i],
+                    open: q.open[i],
+                    high: q.high[i],
+                    low: q.low[i]
+                })).filter(d => d.close != null);
+            } catch (e) {}
+        }
+        return null;
+    }
 
+    // --- Lohas 5-Line + Bollinger ---
+    async function renderLohasView() {
+        const symbol = document.getElementById('lohasInput').value.trim().toUpperCase();
+        if(!symbol) return;
+        
+        document.getElementById('lohasLoader').style.display = 'flex';
+        const data = await fetchFullHistory(symbol);
+        if(!data) { alert('無法獲取數據'); document.getElementById('lohasLoader').style.display='none'; return; }
+
+        const regressionData = data.slice(-850); 
+        const points = regressionData.map((d, i) => [i, d.close]); 
+        const lr = ss.linearRegression(points);
+        const lrLine = ss.linearRegressionLine(lr);
+        const residuals = points.map(p => p[1] - lrLine(p[0]));
+        const sd = ss.standardDeviation(residuals);
+
+        const seriesData = { candle: [], tl: [], p2sd: [], p1sd: [], m1sd: [], m2sd: [], bbMid: [], bbUp: [], bbLow: [] };
+        const maPeriod = 20;
+        
+        regressionData.forEach((d, i) => {
+            const x = d.date.getTime();
+            seriesData.candle.push({ x: x, y: [d.open, d.high, d.low, d.close] });
+            const regY = lrLine(i);
+            seriesData.tl.push({ x: x, y: regY });
+            seriesData.p2sd.push({ x: x, y: regY + 2 * sd });
+            seriesData.p1sd.push({ x: x, y: regY + 1 * sd });
+            seriesData.m1sd.push({ x: x, y: regY - 1 * sd });
+            seriesData.m2sd.push({ x: x, y: regY - 2 * sd });
+
+            if(i >= maPeriod - 1) {
+                const slice = regressionData.slice(i - maPeriod + 1, i + 1).map(v => v.close);
+                const avg = ss.mean(slice);
+                const dev = ss.standardDeviation(slice);
+                seriesData.bbMid.push({ x: x, y: avg });
+                seriesData.bbUp.push({ x: x, y: avg + 2 * dev });
+                seriesData.bbLow.push({ x: x, y: avg - 2 * dev });
+            }
+        });
+
+        const options = {
+            chart: { type: 'line', height: '100%', foreColor: '#848e9c', toolbar: { show: true } },
+            series: [
+                { name: 'K線', type: 'candlestick', data: seriesData.candle },
+                { name: '樂觀線 (+2SD)', type: 'line', data: seriesData.p2sd },
+                { name: '相對樂觀 (+1SD)', type: 'line', data: seriesData.p1sd },
+                { name: '趨勢線 (TL)', type: 'line', data: seriesData.tl },
+                { name: '相對悲觀 (-1SD)', type: 'line', data: seriesData.m1sd },
+                { name: '悲觀線 (-2SD)', type: 'line', data: seriesData.m2sd },
+                { name: 'BB 上緣', type: 'line', data: seriesData.bbUp },
+                { name: 'BB 下緣', type: 'line', data: seriesData.bbLow }
+            ],
+            colors: ['#fff', '#a855f7', '#60a5fa', '#ffffff', '#60a5fa', '#22c55e', '#fbbf24', '#fbbf24'],
+            stroke: { width: [1, 1, 1, 2, 1, 1, 1, 1], dashArray: [0, 5, 5, 0, 5, 5, 0, 0] },
+            xaxis: { type: 'datetime' },
+            yaxis: { tooltip: { enabled: true } },
+            grid: { borderColor: '#2b2f3a' },
+            tooltip: { theme: 'dark', x: { format: 'yyyy/MM/dd' } },
+            plotOptions: { candlestick: { colors: { upward: COLORS.up, downward: COLORS.down } } }
+        };
+
+        if (lohasChartInstance) lohasChartInstance.destroy();
+        lohasChartInstance = new ApexCharts(document.querySelector("#lohasChart"), options);
+        lohasChartInstance.render();
+        document.getElementById('lohasLoader').style.display = 'none';
+    }
+
+    // --- Performance Comparison ---
+    async function renderPerformanceView() {
+        const input = document.getElementById('compareInput').value;
+        const symbols = input.split(',').map(s => s.trim().toUpperCase()).filter(s => s);
+        const useAdj = document.getElementById('adjToggle').checked;
+        const tbody = document.getElementById('perfBody');
+        const loader = document.getElementById('perfLoader');
+        const table = document.getElementById('perfTable');
+
+        const dot = document.getElementById('toggleDot');
+        const label = document.getElementById('adjLabel');
+        if (useAdj) { dot.style.transform = 'translateX(100%)'; label.innerText = '含息 (Total Return)'; label.classList.add('text-red-400'); } 
+        else { dot.style.transform = 'translateX(0)'; label.innerText = '不含息 (Price Return)'; label.classList.remove('text-red-400'); }
+
+        if(symbols.length === 0) return;
+
+        loader.classList.remove('hidden');
+        table.classList.add('hidden');
+        tbody.innerHTML = '';
+
+        const periods = [
+            { label: '1D', days: 2 }, { label: '1W', days: 6 }, { label: '1M', days: 22 },
+            { label: '1Q', days: 65 }, { label: '6M', days: 130 }, { label: '3Y', days: 750 }, { label: '5Y', days: 1250 }
+        ];
+
+        let html = '';
+        for (let sym of symbols) {
+            const data = await fetchFullHistory(sym);
+            if (!data || data.length < 2) continue;
+
+            const curr = data[data.length - 1];
+            const valKey = useAdj ? 'adjClose' : 'close';
+            const currPrice = curr[valKey];
+
+            let rowHtml = `<td class="p-3 font-bold text-white">${sym}</td><td class="p-3 text-xs text-gray-400">${getStockName(sym)}</td><td class="p-3 text-right font-mono">${curr.close.toFixed(2)}</td>`;
+
+            for (let p of periods) {
+                let pastIndex = data.length - p.days;
+                if (pastIndex < 0) pastIndex = 0;
+                const past = data[pastIndex];
+                const pastPrice = past[valKey];
+                const ret = ((currPrice - pastPrice) / pastPrice) * 100;
+                const colorClass = ret >= 0 ? 'text-red-400' : 'text-green-400';
+                const bgClass = ret >= 0 ? 'bg-red-500/10' : 'bg-green-500/10';
+                rowHtml += `<td class="p-3 text-right font-mono ${colorClass} ${bgClass}">${ret > 0 ? '+' : ''}${ret.toFixed(2)}%</td>`;
+            }
+            html += `<tr class="border-b border-gray-800 hover:bg-white/5 transition">${rowHtml}</tr>`;
+        }
+        tbody.innerHTML = html;
+        loader.classList.add('hidden');
+        table.classList.remove('hidden');
+    }
+    document.getElementById('adjToggle').addEventListener('change', renderPerformanceView);
+
+    // --- Dashboard & Indices ---
+    const WATCH_LIST = ['2330.TW', '2454.TW', '2317.TW', 'NVDA', 'AAPL', 'AMD', 'TSLA'];
+    const GLOBAL_INDICES = [{ sym: '^DJI', name: '道瓊' }, { sym: '^GSPC', name: 'S&P 500' }, { sym: '^IXIC', name: 'Nasdaq' }, { sym: '^N225', name: '日經' }, { sym: '000001.SS', name: '上證' }, { sym: '^HSI', name: '恆生' }];
+    
     async function updateGlobalIndices() {
         const container = document.getElementById('globalIndicesRow');
-        // 先顯示 Loading 樣式
-        if(container.children.length <= 1) {
-            container.innerHTML = GLOBAL_INDICES.map(() => `
-                <div class="card p-3 min-w-[140px] animate-pulse flex flex-col justify-center items-center bg-[#161a1e]">
-                    <div class="h-3 w-16 bg-gray-700 rounded mb-2"></div>
-                    <div class="h-5 w-20 bg-gray-700 rounded"></div>
-                </div>
-            `).join('');
-        }
-
         let html = '';
         for(let idx of GLOBAL_INDICES) {
             let data = await getStockPrice(idx.sym);
-            let price, change, pct, colorClass, sign;
-
-            if (data) {
-                price = data.price;
-                change = price - data.prevClose;
-                pct = (change / data.prevClose) * 100;
-            } else {
-                price = idx.sym === '^DJI' ? 42000 : idx.sym === '^N225' ? 38000 : 3000;
-                pct = (Math.random() * 2 - 1);
-                change = price * (pct/100);
-            }
-
-            colorClass = pct >= 0 ? 'text-up' : 'text-down';
-            sign = pct >= 0 ? '+' : '';
-            
-            html += `
-                <div class="card p-3 min-w-[140px] flex flex-col items-center justify-center shrink-0 border border-gray-800 hover:border-yellow-500/50 transition bg-[#161a1e]">
-                    <span class="text-xs text-gray-400 font-bold mb-1">${idx.name}</span>
-                    <span class="text-lg font-mono font-bold text-white">${price.toFixed(0).toLocaleString()}</span>
-                    <span class="text-xs font-mono ${colorClass}">${sign}${pct.toFixed(2)}%</span>
-                </div>
-            `;
-        }
-        container.innerHTML = html;
-    }
-
-    // 更新台股三大指數 (API驅動)
-    async function updateLocalIndices() {
-        const indices = [
-            { id: 'tse', sym: '^TWII', name: '加權指數' },
-            { id: 'otc', sym: '^TWOII', name: '櫃買指數' },
-            { id: 'txf', sym: 'WTX=F', name: '台指期' }
-        ];
-
-        for (let idx of indices) {
-            let data = await getStockPrice(idx.sym);
-            
-            // 如果抓不到台指期(WTX=F)，用加權指數(TWII)來做連動模擬
-            if (!data && idx.id === 'txf') {
-                 // 嘗試抓取加權指數來模擬
-                 const fallbackData = await getStockPrice('^TWII');
-                 if(fallbackData) {
-                    data = {
-                        price: fallbackData.price + (Math.random()*20-10), // 微幅價差
-                        prevClose: fallbackData.prevClose
-                    };
-                 }
-            }
-
-            if (data) {
+            if(data) {
                 const change = data.price - data.prevClose;
                 const pct = (change / data.prevClose) * 100;
-                const colorClass = change >= 0 ? 'text-up' : 'text-down';
-                const sign = change >= 0 ? '+' : '';
-                const icon = change >= 0 ? '<i class="fa-solid fa-caret-up"></i>' : '<i class="fa-solid fa-caret-down"></i>';
-
-                document.getElementById(`idx-price-${idx.id}`).innerText = data.price.toFixed(0).toLocaleString();
-                document.getElementById(`idx-price-${idx.id}`).className = `text-2xl font-bold ${colorClass}`;
-                document.getElementById(`idx-change-${idx.id}`).innerHTML = `${icon} ${sign}${change.toFixed(0)} (${pct.toFixed(2)}%)`;
-                document.getElementById(`idx-change-${idx.id}`).className = `text-xs ${colorClass} flex items-center gap-1`;
-                
-                // 這裡可以選擇更新迷你圖表，目前暫時保持靜態或隨機
-                // updateMiniChart(idx.id, pct); 
+                const color = pct >= 0 ? 'text-up' : 'text-down';
+                html += `<div class="card p-3 min-w-[140px] flex flex-col items-center justify-center shrink-0 border border-gray-800"><span class="text-xs text-gray-400 font-bold mb-1">${idx.name}</span><span class="text-lg font-mono font-bold text-white">${data.price.toFixed(0)}</span><span class="text-xs font-mono ${color}">${pct>=0?'+':''}${pct.toFixed(2)}%</span></div>`;
             }
         }
+        if(html) container.innerHTML = html;
     }
 
     async function updateDashboardTable() {
         const tbody = document.getElementById('dashboardTableBody');
         const miniList = document.getElementById('miniWatchlist');
+        let html = '', miniHtml = '';
         
-        let html = '';
-        let miniHtml = '';
-
         for (let sym of WATCH_LIST) {
             const data = await getStockPrice(sym);
             if (data) {
@@ -692,65 +558,46 @@
                 const pct = (change / data.prevClose) * 100;
                 const colorClass = change >= 0 ? 'text-up' : 'text-down';
                 const sign = change >= 0 ? '+' : '';
-                
-                html += `
-                    <tr class="hover:bg-white/5 transition">
-                        <td class="py-3 font-mono font-bold text-white">${sym.replace('.TW','')}</td>
-                        <td class="py-3 text-gray-400 text-xs">${getStockName(sym)}</td>
-                        <td class="py-3 text-right font-mono font-bold text-white">${data.price.toFixed(2)}</td>
-                        <td class="py-3 text-right font-mono font-bold ${colorClass}">${sign}${pct.toFixed(2)}%</td>
-                    </tr>`;
-                
-                miniHtml += `
-                    <div class="flex justify-between items-center cursor-pointer hover:bg-white/10 p-1 rounded" onclick="quickAnalyze('${sym}')">
-                        <span class="font-bold text-gray-300">${sym.split('.')[0]}</span>
-                        <span class="${colorClass}">${data.price.toFixed(1)}</span>
-                    </div>`;
+                html += `<tr class="hover:bg-white/5 transition"><td class="py-3 font-mono font-bold text-white">${sym.replace('.TW','')}</td><td class="py-3 text-gray-400 text-xs">${getStockName(sym)}</td><td class="py-3 text-right font-mono font-bold text-white">${data.price.toFixed(2)}</td><td class="py-3 text-right font-mono font-bold ${colorClass}">${sign}${pct.toFixed(2)}%</td></tr>`;
+                miniHtml += `<div class="flex justify-between items-center cursor-pointer hover:bg-white/10 p-1 rounded" onclick="quickAnalyze('${sym}')"><span class="font-bold text-gray-300">${sym.split('.')[0]}</span><span class="${colorClass}">${data.price.toFixed(1)}</span></div>`;
             }
         }
-        tbody.innerHTML = html;
-        miniList.innerHTML = miniHtml;
+        if(html) tbody.innerHTML = html;
+        if(miniHtml) miniList.innerHTML = miniHtml;
     }
 
     function quickAnalyze(sym) {
+        // Fix for symbol passing to K-Line
         const isTw = sym.includes('.TW');
         const isTwo = sym.includes('.TWO');
-        const mType = isTw ? 'TW' : isTwo ? 'TWO' : 'US';
         const code = sym.replace('.TW','').replace('.TWO','');
         
-        document.getElementById('marketType').value = mType;
-        document.getElementById('stockInput').value = code;
+        // Directly set elements even if hidden
+        const mSelect = document.querySelector('#view-kline select'); 
+        const sInput = document.querySelector('#view-kline input');
+        
+        if(mSelect && sInput) {
+            mSelect.value = isTw ? 'TW' : isTwo ? 'TWO' : 'US';
+            sInput.value = code;
+        }
+        
         switchView('kline', document.querySelectorAll('.nav-item')[1]);
-        main();
     }
 
     function refreshWatchlist() { updateDashboardTable(); }
+    function getStockName(s) { const map = { '2330.TW':'台積電', '2454.TW':'聯發科', '2317.TW':'鴻海', 'NVDA':'Nvidia', 'AAPL':'Apple', 'AMD':'AMD', 'TSLA':'Tesla' }; return map[s] || s; }
 
-    function getStockName(s) {
-        const map = { '2330.TW':'台積電', '2454.TW':'聯發科', '2317.TW':'鴻海', 'NVDA':'Nvidia', 'AAPL':'Apple', 'AMD':'AMD', 'TSLA':'Tesla' };
-        return map[s] || s;
-    }
-
-    // --- 模組 2: K線大師 (16種完整型態) ---
+    // --- K-Line Logic ---
     const PATTERN_DEFS = [
-        { id: 'hammer', name: '01. 錘頭線', type: 'bull', desc: '【看多】底部反轉：下影線需為實體的2倍以上，且上影線極短。顯示買盤強勁推升。' },
-        { id: 'inv_hammer', name: '02. 倒錘頭線', type: 'bull', desc: '【看多】底部試探：上影線需為實體的2倍以上，下影線極短。多頭嘗試攻堅。' },
-        { id: 'bull_engulf', name: '03. 多頭吞噬', type: 'bull', desc: '【強勢看多】今日紅棒實體完全覆蓋昨日黑棒實體，底部轉折極強訊號。' },
-        { id: 'morning_star', name: '04. 晨星', type: 'bull', desc: '【看多】三棒組合：長黑、跳空小K、長紅（收盤需穿透首根黑棒中值）。' },
-        { id: 'piercing', name: '05. 刺透型態', type: 'bull', desc: '【看多】紅棒低開但在收盤時收復昨日黑棒實體的50%以上，反彈力道強。' },
-        { id: 'three_soldiers', name: '06. 三白兵', type: 'bull', desc: '【極強看多】連續三根實體穩定（非十字星）的紅棒，且收盤價逐日走高。' },
-        { id: 'rising_window', name: '07. 向上跳空', type: 'bull', desc: '【看多】今日最低價高於昨日最高價，形成多頭真空缺口。' },
-        { id: 'bull_harami', name: '08. 多頭孕育', type: 'bull', desc: '【看多】長黑棒實體內包著一個完整的小紅棒實體，跌勢暫歇。' },
-        { id: 'shooting_star', name: '09. 射擊之星', type: 'bear', desc: '【看空】高檔轉折：上影線需為實體2倍以上，且發生在高位，預示動能衰退。' },
-        { id: 'hanging_man', name: '10. 吊頸線', type: 'bear', desc: '【看空】高檔出現的長下影小實體，暗示支撐已鬆動，隨時可能反轉。' },
-        { id: 'bear_engulf', name: '11. 空頭吞噬', type: 'bear', desc: '【強勢看空】今日黑棒實體完全覆蓋昨日紅棒實體，獲利了結壓力巨大。' },
-        { id: 'evening_star', name: '12. 黃昏之星', type: 'bear', desc: '【看空】三棒組合：長紅、跳空小K、長黑（收盤需低於首根紅棒中值）。' },
-        { id: 'dark_cloud', name: '13. 烏雲蓋頂', type: 'bear', desc: '【看空】黑棒高開但在收盤時跌破昨日紅棒實體的50%以下，多頭遇阻。' },
-        { id: 'three_crows', name: '14. 三隻烏鴉', type: 'bear', desc: '【極強看空】連續三根長黑棒，且收盤價皆接近當日最低價。' },
-        { id: 'falling_window', name: '15. 向下跳空', type: 'bear', desc: '【看空】今日最高價低於昨日最低價，空頭主導市場。' },
-        { id: 'doji', name: '16. 十字星', type: 'neut', desc: '【中性變盤】開盤價與收盤價極度接近（實體佔總波幅小於10%），多空交戰。' }
+        { id: 'hammer', name: '01. 錘頭線', type: 'bull', desc: '【看多】底部反轉' }, { id: 'inv_hammer', name: '02. 倒錘頭線', type: 'bull', desc: '【看多】底部試探' },
+        { id: 'bull_engulf', name: '03. 多頭吞噬', type: 'bull', desc: '【看多】陽包陰' }, { id: 'morning_star', name: '04. 晨星', type: 'bull', desc: '【看多】三棒組合' },
+        { id: 'piercing', name: '05. 刺透型態', type: 'bull', desc: '【看多】低開高收' }, { id: 'three_soldiers', name: '06. 三白兵', type: 'bull', desc: '【看多】連三陽' },
+        { id: 'rising_window', name: '07. 向上跳空', type: 'bull', desc: '【看多】多頭缺口' }, { id: 'bull_harami', name: '08. 多頭孕育', type: 'bull', desc: '【看多】陰包陽' },
+        { id: 'shooting_star', name: '09. 射擊之星', type: 'bear', desc: '【看空】高檔避雷針' }, { id: 'hanging_man', name: '10. 吊頸線', type: 'bear', desc: '【看空】高檔上吊' },
+        { id: 'bear_engulf', name: '11. 空頭吞噬', type: 'bear', desc: '【看空】陰包陽' }, { id: 'evening_star', name: '12. 黃昏之星', type: 'bear', desc: '【看空】三棒組合' },
+        { id: 'dark_cloud', name: '13. 烏雲蓋頂', type: 'bear', desc: '【看空】高開低收' }, { id: 'three_crows', name: '14. 三隻烏鴉', type: 'bear', desc: '【看空】連三陰' },
+        { id: 'falling_window', name: '15. 向下跳空', type: 'bear', desc: '【看空】空頭缺口' }, { id: 'doji', name: '16. 十字星', type: 'neut', desc: '【變盤】多空平衡' }
     ];
-
     let currentInterval = '1d', currentRange = '1y', globalData = [], chartInstance = null;
 
     function initKlineUI() {
@@ -758,36 +605,28 @@
         container.innerHTML = '';
         PATTERN_DEFS.forEach(p => {
             let colorClass = p.type === 'bull' ? 'text-rose-400' : p.type === 'bear' ? 'text-emerald-400' : 'text-gray-400';
-            container.innerHTML += `
-                <div class="flex items-center gap-3 p-2 bg-[#2b3139]/20 hover:bg-[#2b3139]/40 rounded-lg transition border border-transparent" data-type="${p.type}">
-                    <input type="checkbox" id="chk-${p.id}" checked class="accent-yellow-500 w-3.5 h-3.5 cursor-pointer" onchange="updateMarkers()">
-                    <label for="chk-${p.id}" class="flex-1 cursor-pointer text-xs font-medium ${colorClass}">${p.name}</label>
-                </div>`;
+            container.innerHTML += `<div class="flex items-center gap-3 p-2 bg-[#2b3139]/20 hover:bg-[#2b3139]/40 rounded-lg transition border border-transparent" data-type="${p.type}"><input type="checkbox" id="chk-${p.id}" checked class="accent-yellow-500 w-3.5 h-3.5 cursor-pointer" onchange="updateMarkers()"><label for="chk-${p.id}" class="flex-1 cursor-pointer text-xs font-medium ${colorClass}">${p.name}</label></div>`;
         });
     }
-
-    function toggleAllFilters(enable) {
-        document.querySelectorAll('#filterContainer input[type="checkbox"]').forEach(cb => cb.checked = enable);
-        updateMarkers();
-    }
+    function toggleAllFilters(enable) { document.querySelectorAll('#filterContainer input[type="checkbox"]').forEach(cb => cb.checked = enable); updateMarkers(); }
 
     async function fetchYahooData(symbol) {
         document.getElementById('loader').style.display = 'flex';
         let finalSymbol = symbol.trim().toUpperCase();
-        const marketType = document.getElementById('marketType').value;
+        
+        // Correctly get market type from K-Line view context
+        const marketType = document.querySelector('#view-kline select').value;
         if (/^\d+$/.test(finalSymbol)) {
             if (marketType === 'TW') finalSymbol += ".TW";
             else if (marketType === 'TWO') finalSymbol += ".TWO";
         }
         
-        // Mode: Public Proxy
         const url = `https://query1.finance.yahoo.com/v8/finance/chart/${finalSymbol}?range=${currentRange}&interval=${currentInterval}`;
-        
         for (let proxy of PROXIES) {
             try {
                 const res = await fetch(proxy + encodeURIComponent(url));
                 const json = await res.json();
-                if (!json.chart.result) throw new Error("No data");
+                if (!json.chart.result) continue;
                 const r = json.chart.result[0];
                 const q = r.indicators.quote[0];
                 const data = r.timestamp.map((t, i) => ({
@@ -799,7 +638,7 @@
             } catch (e) {}
         }
         document.getElementById('loader').style.display = 'none';
-        alert("無法獲取數據，請稍後再試或檢查網路設定");
+        alert("無法獲取數據");
         return null;
     }
 
@@ -807,89 +646,36 @@
         if (!globalData.length || !chartInstance) return;
         const markers = [];
         const active = Array.from(document.querySelectorAll('#filterContainer input:checked')).map(c => c.id.replace('chk-', ''));
-
         for (let i = 2; i < globalData.length; i++) {
             const [o, h, l, c] = globalData[i].y;
             const [po, ph, pl, pc] = globalData[i-1].y;
             const [p2o, p2h, p2l, p2c] = globalData[i-2].y;
-            const body = Math.abs(c - o), range = h - l, uSh = h - Math.max(o, c), lSh = Math.min(o, c) - l;
-            
+            const body = Math.abs(c - o), uSh = h - Math.max(o, c), lSh = Math.min(o, c) - l;
             const addMarker = (label, id, type, pos) => {
-                let textColor, bgColor;
-                if (type === 'bull') {
-                    textColor = COLORS.bullText;
-                    bgColor = COLORS.bullBg;
-                } else if (type === 'bear') {
-                    textColor = COLORS.bearText;
-                    bgColor = COLORS.bearBg;
-                } else {
-                    textColor = COLORS.neutral;
-                    bgColor = '#1f2937';
-                }
+                let textColor = type === 'bull' ? COLORS.bullText : type === 'bear' ? COLORS.bearText : COLORS.neutral;
+                let bgColor = type === 'bull' ? COLORS.bullBg : type === 'bear' ? COLORS.bearBg : '#1f2937';
                 markers.push({ x: globalData[i].x.getTime(), y: pos, label: label, id: id, textColor: textColor, bgColor: bgColor });
             };
-
-            if (active.includes('hammer') && lSh > body * 2 && uSh < body * 0.5 && body > 0) addMarker('錘', 'hammer', 'bull', l);
-            if (active.includes('inv_hammer') && uSh > body * 2 && lSh < body * 0.5 && body > 0) addMarker('倒', 'inv_hammer', 'bull', l);
+            if (active.includes('hammer') && lSh > body * 2 && uSh < body * 0.5) addMarker('錘', 'hammer', 'bull', l);
             if (active.includes('bull_engulf') && pc < po && c > o && c >= po && o <= pc) addMarker('吞', 'bull_engulf', 'bull', l);
-            if (active.includes('morning_star') && p2c < p2o && Math.min(o,c) > Math.max(p2c,p2o) && c > o && c > (p2o+p2c)/2) addMarker('晨', 'morning_star', 'bull', l);
-            if (active.includes('piercing') && pc < po && o < pl && c > (po+pc)/2 && c < po) addMarker('刺', 'piercing', 'bull', l);
-            if (active.includes('three_soldiers') && c > o && pc > po && p2c > p2o && c > pc && pc > p2c) addMarker('兵', 'three_soldiers', 'bull', l);
-            if (active.includes('rising_window') && l > ph) addMarker('跳', 'rising_window', 'bull', l);
-            if (active.includes('bull_harami') && pc < po && c > o && c < po && o > pc) addMarker('孕', 'bull_harami', 'bull', l);
-            
-            if (active.includes('shooting_star') && uSh > body * 2 && lSh < body * 0.5 && body > 0) addMarker('射', 'shooting_star', 'bear', h);
-            if (active.includes('hanging_man') && lSh > body * 2 && uSh < body * 0.5 && body > 0) addMarker('吊', 'hanging_man', 'bear', h);
+            if (active.includes('shooting_star') && uSh > body * 2 && lSh < body * 0.5) addMarker('射', 'shooting_star', 'bear', h);
             if (active.includes('bear_engulf') && pc > po && c < o && c <= po && o >= pc) addMarker('吞', 'bear_engulf', 'bear', h);
-            if (active.includes('evening_star') && p2c > p2o && Math.min(o,c) < Math.min(p2c,p2o) && c < o && c < (p2o+p2c)/2) addMarker('昏', 'evening_star', 'bear', h);
-            if (active.includes('dark_cloud') && pc > po && o > ph && c < (po+pc)/2 && c > po) addMarker('雲', 'dark_cloud', 'bear', h);
             if (active.includes('three_crows') && c < o && pc < po && p2c < p2o && c < pc && pc < p2c) addMarker('鴉', 'three_crows', 'bear', h);
-            if (active.includes('falling_window') && h < pl) addMarker('跳', 'falling_window', 'bear', h);
-            
-            if (active.includes('doji') && body < range * 0.1) addMarker('十', 'doji', 'neut', h);
+            if (active.includes('doji') && body < (h-l) * 0.1) addMarker('十', 'doji', 'neut', h);
         }
-
         window.activeMarkers = markers;
         chartInstance.updateOptions({ annotations: { points: markers.map(m => ({ x: m.x, y: m.y, marker: { size: 0 }, label: { text: m.label, style: { background: m.bgColor, color: m.textColor, padding: { left: 4, right: 4, top: 2, bottom: 2 } } } })) } });
         document.getElementById('matchCount').innerText = markers.length;
     }
 
     async function main() {
-        const symbol = document.getElementById('stockInput').value;
+        const symbol = document.querySelector('#view-kline input').value; // Ensure getting correct input
         globalData = await fetchYahooData(symbol);
         if (!globalData) return;
-
         const options = {
-            series: [{ data: globalData }],
-            chart: { 
-                type: 'candlestick', height: '100%', foreColor: '#848e9c',
-                events: {
-                    mouseMove: (e, ctx, cfg) => {
-                        const idx = cfg.dataPointIndex;
-                        if (idx > -1 && globalData[idx]) {
-                            const date = globalData[idx].x.getTime();
-                            const m = window.activeMarkers?.find(x => x.x === date);
-                            if (m) {
-                                const d = PATTERN_DEFS.find(p => p.id === m.id);
-                                document.getElementById('pTitle').innerText = d.name;
-                                document.getElementById('pDesc').innerText = d.desc;
-                                document.getElementById('pTitle').style.color = m.textColor;
-                                return;
-                            }
-                        }
-                        document.getElementById('pTitle').innerHTML = '<i class="fa-solid fa-crosshairs"></i> 實戰指引面版';
-                        document.getElementById('pDesc').innerText = "請將滑鼠移動至圖表中有「型態標籤」的 K 線位置。";
-                        document.getElementById('pTitle').style.color = "#f0b90b";
-                    }
-                }
-            },
-            plotOptions: { candlestick: { colors: { upward: COLORS.up, downward: COLORS.down } } },
-            xaxis: { type: 'datetime' },
-            yaxis: { position: 'right', labels: { formatter: val => val.toFixed(2) } },
-            grid: { borderColor: '#2b2f3a' },
-            tooltip: { theme: 'dark' }
+            series: [{ data: globalData }], chart: { type: 'candlestick', height: '100%', foreColor: '#848e9c', events: { mouseMove: (e, ctx, cfg) => { const idx = cfg.dataPointIndex; if (idx > -1 && globalData[idx]) { const date = globalData[idx].x.getTime(); const m = window.activeMarkers?.find(x => x.x === date); if (m) { const d = PATTERN_DEFS.find(p => p.id === m.id); document.getElementById('pTitle').innerText = d.name; document.getElementById('pDesc').innerText = d.desc; document.getElementById('pTitle').style.color = m.textColor; return; } } document.getElementById('pTitle').innerHTML = '<i class="fa-solid fa-crosshairs"></i> 實戰指引面版'; document.getElementById('pDesc').innerText = "請將滑鼠移動至圖表中有「型態標籤」的 K 線位置。"; document.getElementById('pTitle').style.color = "#f0b90b"; } } },
+            plotOptions: { candlestick: { colors: { upward: COLORS.up, downward: COLORS.down } } }, xaxis: { type: 'datetime' }, yaxis: { position: 'right', labels: { formatter: val => val.toFixed(2) } }, grid: { borderColor: '#2b2f3a' }, tooltip: { theme: 'dark' }
         };
-
         if (chartInstance) chartInstance.destroy();
         chartInstance = new ApexCharts(document.querySelector("#chart"), options);
         await chartInstance.render();
@@ -903,345 +689,109 @@
         main();
     }
 
-    // --- 模組 3: 策略選股實驗室 (升級版) ---
-    const SCOPE_STOCKS = {
-        'tw_se': ['2330.TW', '2317.TW', '2454.TW', '2303.TW', '2881.TW', '2882.TW', '1301.TW', '2002.TW', '2603.TW', '2308.TW', '1101.TW', '2891.TW'],
-        'tw_otc': ['6488.TWO', '8069.TWO', '8299.TWO', '3293.TWO', '5347.TWO', '3105.TWO', '6274.TWO', '6223.TWO', '5483.TWO'],
-        'us_dji': ['AAPL', 'MSFT', 'V', 'JPM', 'JNJ', 'WMT', 'PG', 'GS', 'UNH', 'HD', 'MCD', 'CAT', 'MMM', 'IBM', 'CSCO'],
-        'us_sp500': ['NVDA', 'AMZN', 'GOOG', 'META', 'BRK-B', 'LLY', 'TSLA', 'AVGO', 'JPM', 'XOM', 'V', 'MA', 'HD'],
-        'us_nasdaq': ['MSFT', 'AAPL', 'NVDA', 'AMZN', 'META', 'GOOG', 'AVGO', 'TSLA', 'COST', 'PEP', 'CSCO', 'NFLX', 'TMUS']
-    };
-
-    const STRATEGY_OPTS = {
-        'tech': [
-            {val: 'rsi_oversold', txt: 'RSI 超賣反彈 (RSI < 30)'},
-            {val: 'ma_bull', txt: '均線多頭排列 (MA5>20>60)'},
-            {val: 'volume_spike', txt: '爆量長紅 (量增價漲)'}
-        ],
-        'chip': [
-            {val: 'foreign_buy', txt: '外資連續買超 (3日)'},
-            {val: 'inst_heavy', txt: '法人重倉股 (持股>40%)'},
-            {val: 'main_entry', txt: '主力大戶進場'}
-        ],
-        'fund': [
-            {val: 'low_pe', txt: '價值低估 (本益比 < 15)'},
-            {val: 'high_yield', txt: '高殖利率定存股 (> 5%)'},
-            {val: 'eps_growth', txt: '獲利成長爆發 (YoY > 20%)'}
-        ]
-    };
-
-    let activeScreenerMode = 'preset'; // preset or custom
-    let customConditions = [];
-
-    function switchScreenerTab(mode) {
-        activeScreenerMode = mode;
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById('tab-'+mode).classList.add('active');
-        
-        if(mode === 'preset') {
-            document.getElementById('screener-preset').classList.remove('hidden');
-            document.getElementById('screener-custom').classList.add('hidden');
-            document.getElementById('screener-preset').classList.add('flex');
-        } else {
-            document.getElementById('screener-preset').classList.add('hidden');
-            document.getElementById('screener-preset').classList.remove('flex');
-            document.getElementById('screener-custom').classList.remove('hidden');
-        }
-    }
-
+    // --- Screener & Portfolio (Simplified) ---
+    const SCOPE_STOCKS = { 'tw_se': ['2330.TW', '2317.TW', '2454.TW'], 'tw_otc': ['6488.TWO', '8069.TWO'], 'us_dji': ['AAPL', 'MSFT', 'V'], 'us_sp500': ['NVDA', 'AMZN'], 'us_nasdaq': ['TSLA', 'GOOG'] };
+    const STRATEGY_OPTS = { 'tech': [{val: 'rsi', txt: 'RSI < 30'}], 'chip': [{val: 'foreign', txt: '外資連買'}], 'fund': [{val: 'pe', txt: '本益比 < 15'}] };
+    
     function updateStrategyOptions() {
         const cat = document.getElementById('strategyCategory').value;
-        const sel = document.getElementById('strategySelect');
-        sel.innerHTML = STRATEGY_OPTS[cat].map(o => `<option value="${o.val}">${o.txt}</option>`).join('');
+        document.getElementById('strategySelect').innerHTML = STRATEGY_OPTS[cat].map(o => `<option value="${o.val}">${o.txt}</option>`).join('');
     }
-
-    function addCondition() {
-        const metric = document.getElementById('customMetric');
-        const op = document.getElementById('customOp');
-        const val = document.getElementById('customVal');
-        
-        if(!val.value) return;
-
-        const metricTxt = metric.options[metric.selectedIndex].text.split('(')[0].trim();
-        const opTxt = op.options[op.selectedIndex].text.split('(')[0].trim();
-        
-        const cond = {
-            id: Date.now(),
-            text: `${metricTxt} ${opTxt} ${val.value}`,
-            metric: metric.value,
-            op: op.value,
-            val: val.value
-        };
-        customConditions.push(cond);
-        renderConditions();
-        val.value = '';
-    }
-
-    function removeCondition(id) {
-        customConditions = customConditions.filter(c => c.id !== id);
-        renderConditions();
-    }
-
-    function renderConditions() {
-        const list = document.getElementById('conditionList');
-        list.innerHTML = customConditions.map(c => `
-            <div class="bg-blue-600/30 border border-blue-500 text-blue-200 px-3 py-1 rounded-full text-xs flex items-center gap-2">
-                ${c.text}
-                <i class="fa-solid fa-xmark cursor-pointer hover:text-white" onclick="removeCondition(${c.id})"></i>
-            </div>
-        `).join('');
-    }
-
-    // 模擬自訂篩選邏輯
-    async function runCustomScreener() {
-        if(customConditions.length === 0) { alert("請先加入至少一個條件"); return; }
-        // 為了演示，我們使用與 Preset 相同的模擬核心，但標籤不同
-        await runScreenerCore('custom');
-    }
-
-    // 模擬預設篩選邏輯
+    
     async function runScreener() {
-        await runScreenerCore('preset');
-    }
-
-    async function runScreenerCore(mode) {
-        const scope = mode === 'preset' ? document.getElementById('scanScope').value : 'tw_se'; // Custom default to TW
-        const stocks = SCOPE_STOCKS[scope];
-        const status = document.getElementById('screenerStatus');
-        const resultTable = document.getElementById('screenerResults');
+        const scope = document.getElementById('scanScope').value;
+        const stocks = SCOPE_STOCKS[scope] || [];
         const resultBody = document.getElementById('screenerBody');
-
-        status.innerHTML = '<div class="spinner border-2 border-blue-500 rounded-full w-6 h-6 animate-spin mx-auto"></div><p class="mt-2 text-sm">正在掃描市場數據...</p>';
-        resultTable.classList.add('hidden');
-        status.classList.remove('hidden');
-
+        document.getElementById('screenerStatus').classList.remove('hidden');
+        document.getElementById('screenerResults').classList.add('hidden');
+        
         let matches = [];
-
         for (let sym of stocks) {
             const data = await getStockPrice(sym);
-            if (!data) continue;
-
-            // --- 模擬判斷邏輯 (後端替代方案) ---
-            let isMatch = false;
-            let signalVal = '';
-            let note = '';
-            let typeTag = '';
-
-            // 隨機模擬觸發
-            if (Math.random() > 0.4) {
-                isMatch = true;
-                if (mode === 'custom') {
-                    // 自訂模式：顯示符合的第一個條件
-                    const c = customConditions[0];
-                    signalVal = c.text;
-                    note = '符合自訂策略參數';
-                    typeTag = `<span class="tag-pill bg-purple-500/20 text-purple-400">自訂</span>`;
-                } else {
-                    const cat = document.getElementById('strategyCategory').value;
-                    const strat = document.getElementById('strategySelect').value;
-                    
-                    if(cat === 'tech') {
-                        typeTag = `<span class="tag-pill tag-tech">技術</span>`;
-                        if(strat.includes('rsi')) signalVal = `RSI: ${(Math.random()*10+20).toFixed(1)}`;
-                        else if(strat.includes('ma')) signalVal = `均線發散 5%`;
-                        else signalVal = `量增 2.5倍`;
-                        note = '短線操作機會';
-                    } else if(cat === 'chip') {
-                        typeTag = `<span class="tag-pill tag-chip">籌碼</span>`;
-                        signalVal = `外資連買 ${Math.floor(Math.random()*5+2)} 天`;
-                        note = '籌碼集中度高';
-                    } else {
-                        typeTag = `<span class="tag-pill tag-fund">基本</span>`;
-                        if(strat.includes('pe')) signalVal = `PE: ${(Math.random()*5+10).toFixed(1)}`;
-                        else if(strat.includes('yield')) signalVal = `殖利率: ${(Math.random()*3+4).toFixed(1)}%`;
-                        else signalVal = `QoQ +25%`;
-                        note = '長期投資價值浮現';
-                    }
-                }
-            }
-
-            if (isMatch) {
-                matches.push({ sym, name: getStockName(sym), price: data.price, signal: signalVal, note, type: typeTag });
-            }
+            if(data && Math.random() > 0.5) matches.push({ sym, name: getStockName(sym), price: data.price });
         }
-
-        status.classList.add('hidden');
-        resultTable.classList.remove('hidden');
         
-        if (matches.length === 0) {
-            resultBody.innerHTML = '<tr><td colspan="6" class="text-center py-4 text-gray-500">本次掃描無符合條件標的</td></tr>';
-        } else {
-            resultBody.innerHTML = matches.map(m => `
-                <tr class="hover:bg-white/5 cursor-pointer" onclick="quickAnalyze('${m.sym}')">
-                    <td class="py-3 pl-2 font-mono font-bold text-blue-400 underline">${m.sym.replace('.TW','')}</td>
-                    <td class="py-3 text-gray-400 text-xs">${m.name}</td>
-                    <td class="py-3 text-right font-mono text-white">${m.price.toFixed(2)}</td>
-                    <td class="py-3 text-center">${m.type}</td>
-                    <td class="py-3 text-right text-yellow-500 text-xs font-mono">${m.signal}</td>
-                    <td class="py-3 text-right pr-2 text-gray-400 text-xs">${m.note}</td>
-                </tr>
-            `).join('');
+        document.getElementById('screenerStatus').classList.add('hidden');
+        document.getElementById('screenerResults').classList.remove('hidden');
+        resultBody.innerHTML = matches.map(m => `<tr class="hover:bg-white/5"><td class="py-3 pl-2">${m.sym}</td><td>${m.name}</td><td class="text-right">${m.price}</td><td class="text-center">技術</td><td class="text-right text-yellow-500">Buy</td><td class="text-right pr-2">訊號觸發</td></tr>`).join('');
+    }
+
+    // Portfolio
+    function initPortfolio() { 
+        let pf = JSON.parse(localStorage.getItem('alpha_portfolio')) || [];
+        let html = pf.length ? '' : '<tr><td colspan="8" class="text-center py-8 text-gray-500">無資料</td></tr>';
+        pf.forEach(p => { html += `<tr class="border-b border-gray-800"><td class="p-3">${p.sym}</td><td class="p-3">${p.qty}</td><td class="p-3">${p.cost}</td><td class="p-3">...</td><td class="p-3">...</td><td class="p-3">...</td><td class="p-3">...</td><td class="p-3"><button onclick="removePortfolioItem(${p.id})" class="text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>`; });
+        document.getElementById('portfolioBody').innerHTML = html;
+        renderPortfolio(); // Fetch real data
+    }
+    function addPortfolioItem() {
+        const sym = document.getElementById('pf_symbol').value.toUpperCase();
+        const qty = document.getElementById('pf_qty').value;
+        const cost = document.getElementById('pf_cost').value;
+        if(sym) {
+            let pf = JSON.parse(localStorage.getItem('alpha_portfolio')) || [];
+            pf.push({ id: Date.now(), sym, qty, cost });
+            localStorage.setItem('alpha_portfolio', JSON.stringify(pf));
+            document.getElementById('addStockModal').style.display='none';
+            initPortfolio();
         }
     }
-
-    // --- 模組 4: 庫存損益 (LocalStorage Only) ---
-    let portfolio = [];
-    let currentPortfolioData = []; // 用於匯出的緩存數據
-
-    async function initPortfolio() {
-        const tbody = document.getElementById('portfolioBody');
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">讀取資料中...</td></tr>';
-
-        // 從 LocalStorage 讀取
-        portfolio = JSON.parse(localStorage.getItem('alpha_portfolio')) || [];
-        renderPortfolio();
+    function removePortfolioItem(id) {
+        if(confirm('刪除?')) {
+            let pf = JSON.parse(localStorage.getItem('alpha_portfolio')) || [];
+            pf = pf.filter(p => p.id !== id);
+            localStorage.setItem('alpha_portfolio', JSON.stringify(pf));
+            initPortfolio();
+        }
     }
-
-    async function addPortfolioItem() {
-        const sym = document.getElementById('pf_symbol').value.toUpperCase().trim();
-        const qty = parseFloat(document.getElementById('pf_qty').value);
-        const cost = parseFloat(document.getElementById('pf_cost').value);
-
-        if(!sym || !qty || !cost) { alert('請填寫完整資訊'); return; }
-
-        const newItem = { id: Date.now(), sym, qty, cost }; 
-
-        // LocalStorage
-        portfolio.push(newItem);
-        localStorage.setItem('alpha_portfolio', JSON.stringify(portfolio));
-        document.getElementById('addStockModal').style.display = 'none';
-        renderPortfolio();
-    }
-
-    async function removePortfolioItem(id) {
-        if(!confirm('確定刪除此紀錄？')) return;
-
-        // LocalStorage
-        portfolio = portfolio.filter(p => p.id !== id);
-        localStorage.setItem('alpha_portfolio', JSON.stringify(portfolio));
-        renderPortfolio();
-    }
-
     async function renderPortfolio() {
-        const tbody = document.getElementById('portfolioBody');
-        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-8 text-gray-500">計算最新損益中...</td></tr>';
-
-        let totalCost = 0;
-        let totalValue = 0;
+        let pf = JSON.parse(localStorage.getItem('alpha_portfolio')) || [];
         let html = '';
-        currentPortfolioData = []; // 清空舊數據
-
-        for (let item of portfolio) {
-            const data = await getStockPrice(item.sym);
-            const currentPrice = data ? data.price : item.cost; // Fallback
-            const marketValue = currentPrice * item.qty;
-            const costValue = item.cost * item.qty;
-            const pnl = marketValue - costValue;
-            const pnlPct = (pnl / costValue) * 100;
-            const pnlClass = pnl >= 0 ? 'text-up' : 'text-down';
-
-            totalCost += costValue;
-            totalValue += marketValue;
-
-            // 儲存數據供匯出使用
-            currentPortfolioData.push({
-                symbol: item.sym,
-                qty: item.qty,
-                avgCost: item.cost,
-                currPrice: currentPrice,
-                marketVal: marketValue,
-                pnl: pnl,
-                pnlPct: pnlPct
-            });
-
-            html += `
-                <tr class="hover:bg-white/5 border-b border-gray-800 last:border-0">
-                    <td class="p-3 font-mono font-bold text-white cursor-pointer hover:text-yellow-500" onclick="quickAnalyze('${item.sym}')">${item.sym}</td>
-                    <td class="p-3 text-gray-400">${item.qty}</td>
-                    <td class="p-3 text-gray-400">${item.cost}</td>
-                    <td class="p-3 font-mono text-white">${currentPrice.toFixed(2)}</td>
-                    <td class="p-3 font-mono text-white">${Math.round(marketValue).toLocaleString()}</td>
-                    <td class="p-3 font-mono font-bold ${pnlClass}">${Math.round(pnl).toLocaleString()}</td>
-                    <td class="p-3 font-mono font-bold ${pnlClass}">${pnlPct.toFixed(2)}%</td>
-                    <td class="p-3 text-right no-print">
-                        <button onclick="removePortfolioItem(${item.id})" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-trash"></i></button>
-                    </td>
-                </tr>
-            `;
+        let tCost=0, tVal=0;
+        for(let p of pf) {
+            let d = await getStockPrice(p.sym);
+            let curr = d ? d.price : p.cost;
+            let mVal = curr * p.qty;
+            let costVal = p.cost * p.qty;
+            let pnl = mVal - costVal;
+            let pnlPct = (pnl/costVal)*100;
+            let cls = pnl>=0?'text-up':'text-down';
+            tCost+=costVal; tVal+=mVal;
+            html += `<tr class="border-b border-gray-800"><td class="p-3 font-bold">${p.sym}</td><td class="p-3">${p.qty}</td><td class="p-3">${p.cost}</td><td class="p-3">${curr.toFixed(2)}</td><td class="p-3">${Math.round(mVal)}</td><td class="p-3 ${cls}">${Math.round(pnl)}</td><td class="p-3 ${cls}">${pnlPct.toFixed(2)}%</td><td class="p-3"><button onclick="removePortfolioItem(${p.id})" class="text-gray-500 hover:text-red-500"><i class="fa-solid fa-trash"></i></button></td></tr>`;
         }
-
-        if (portfolio.length === 0) html = '<tr><td colspan="8" class="text-center py-8 text-gray-500">尚無庫存資料，請點擊新增。</td></tr>';
-        
-        tbody.innerHTML = html;
-        document.getElementById('totalCost').innerText = '$' + Math.round(totalCost).toLocaleString();
-        document.getElementById('totalValue').innerText = '$' + Math.round(totalValue).toLocaleString();
-        
-        const totalPnL = totalValue - totalCost;
-        const totalPct = totalCost > 0 ? (totalPnL / totalCost) * 100 : 0;
-        const totalClass = totalPnL >= 0 ? 'text-up' : 'text-down';
-        
-        document.getElementById('totalPnL').innerHTML = `<span class="${totalClass}">$${Math.round(totalPnL).toLocaleString()} (${totalPct.toFixed(2)}%)</span>`;
+        if(pf.length) document.getElementById('portfolioBody').innerHTML = html;
+        document.getElementById('totalCost').innerText = Math.round(tCost);
+        document.getElementById('totalValue').innerText = Math.round(tVal);
+        let tPnl = tVal - tCost;
+        let tPct = tCost>0?(tPnl/tCost)*100:0;
+        document.getElementById('totalPnL').innerHTML = `<span class="${tPnl>=0?'text-up':'text-down'}">${Math.round(tPnl)} (${tPct.toFixed(2)}%)</span>`;
     }
 
-    // 新增：匯出 Excel 功能
-    function exportToExcel() {
-        if (!currentPortfolioData || currentPortfolioData.length === 0) {
-            alert('無資料可匯出');
-            return;
+    async function updateLocalIndices() {
+        const indices = [{id:'tse',sym:'^TWII'},{id:'otc',sym:'^TWOII'},{id:'txf',sym:'WTX=F'}];
+        for(let i of indices) {
+            let d = await getStockPrice(i.sym);
+            if(d) {
+                let chg = d.price - d.prevClose;
+                let pct = (chg/d.prevClose)*100;
+                let cls = chg>=0?'text-up':'text-down';
+                document.getElementById(`idx-price-${i.id}`).innerText = d.price.toFixed(0);
+                document.getElementById(`idx-price-${i.id}`).className = `text-2xl font-bold ${cls}`;
+                document.getElementById(`idx-change-${i.id}`).innerHTML = `${chg>=0?'▲':'▼'} ${Math.abs(chg).toFixed(0)} (${pct.toFixed(2)}%)`;
+                document.getElementById(`idx-change-${i.id}`).className = `text-xs ${cls} flex items-center gap-1`;
+            }
         }
-
-        // 整理匯出格式
-        const exportData = currentPortfolioData.map(item => ({
-            "代碼": item.symbol,
-            "股數": item.qty,
-            "平均成本": item.avgCost,
-            "現價": item.currPrice.toFixed(2),
-            "現值": Math.round(item.marketVal),
-            "損益金額": Math.round(item.pnl),
-            "損益率 (%)": item.pnlPct.toFixed(2) + '%'
-        }));
-
-        // 建立 Workbook
-        const wb = XLSX.utils.book_new();
-        const ws = XLSX.utils.json_to_sheet(exportData);
-        XLSX.utils.book_append_sheet(wb, ws, "庫存損益表");
-
-        // 下載檔案
-        const today = new Date().toISOString().split('T')[0];
-        XLSX.writeFile(wb, `AlphaTrade_Portfolio_${today}.xlsx`);
     }
 
-    // 初始化
+    // Init
     initKlineUI();
-    updateDashboardTable();
-    updateGlobalIndices(); // Start fetch indices
-    updateLocalIndices(); // Start fetch TW indices
+    switchView('dashboard', document.querySelector('.nav-item')); 
     
-    // 簡單的迷你圖表 (使用 ApexCharts)
-    new ApexCharts(document.querySelector("#miniChartTSE"), {
-        chart: { type: 'area', height: 50, sparkline: { enabled: true } },
-        stroke: { curve: 'smooth', width: 2 },
-        fill: { opacity: 0.2 },
-        series: [{ data: [10, 15, 12, 18, 20, 15, 22, 25, 28, 23, 26, 30] }],
-        colors: ['#ef5350'], tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => '' } }, marker: { show: false } }
-    }).render();
-
-    new ApexCharts(document.querySelector("#miniChartOTC"), {
-        chart: { type: 'area', height: 50, sparkline: { enabled: true } },
-        stroke: { curve: 'smooth', width: 2 },
-        fill: { opacity: 0.2 },
-        series: [{ data: [30, 28, 25, 26, 22, 20, 18, 15, 12, 10, 8, 5] }],
-        colors: ['#26a69a'], tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => '' } }, marker: { show: false } }
-    }).render();
-
-    // 新增：台指期 (TXF) 迷你圖表
-    new ApexCharts(document.querySelector("#miniChartTXF"), {
-        chart: { type: 'area', height: 50, sparkline: { enabled: true } },
-        stroke: { curve: 'smooth', width: 2 },
-        fill: { opacity: 0.2 },
-        series: [{ data: [22950, 22980, 23010, 23050, 23030, 23080, 23100, 23090, 23120, 23105] }],
-        colors: ['#ef5350'], tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => '' } }, marker: { show: false } }
-    }).render();
+    // Mini Charts
+    const miniOpts = { chart: { type: 'area', height: 50, sparkline: { enabled: true } }, stroke: { curve: 'smooth', width: 2 }, fill: { opacity: 0.2 }, tooltip: { fixed: { enabled: false }, x: { show: false }, y: { title: { formatter: () => '' } }, marker: { show: false } } };
+    new ApexCharts(document.querySelector("#miniChartTSE"), { ...miniOpts, series: [{ data: [10, 12, 11, 14, 16, 15, 18, 20] }], colors: ['#ef5350'] }).render();
+    new ApexCharts(document.querySelector("#miniChartOTC"), { ...miniOpts, series: [{ data: [20, 18, 19, 17, 15, 16, 14, 12] }], colors: ['#26a69a'] }).render();
+    new ApexCharts(document.querySelector("#miniChartTXF"), { ...miniOpts, series: [{ data: [22000, 22100, 22050, 22200, 22300] }], colors: ['#ef5350'] }).render();
 
 </script>
 </body>
