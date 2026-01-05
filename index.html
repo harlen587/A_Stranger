@@ -201,11 +201,58 @@
             </div>
         </div>
 
-        <!-- View: 型態百科 (Encyclopedia) -->
+                <!-- View: 型態百科 (Encyclopedia) -->
         <div id="view-encyclopedia" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
             <div class="card border-t-4 border-yellow-500">
                 <div class="p-6 border-b border-gray-800"><h2 class="text-xl font-bold mb-2 flex items-center gap-2"><i class="fa-solid fa-book-open text-yellow-500"></i> K線型態百科</h2><p class="text-sm text-gray-400">完整收錄 16 種經典 K 線型態定義與實戰含義。</p></div>
-                <div class="p-6"><div id="encyclopediaGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4"></div></div>
+                <div class="p-6">
+                    <div id="encyclopediaGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8"></div>
+                    
+                    <div class="border-t border-gray-800 pt-6 mt-6">
+                        <h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-layer-group text-blue-400"></i> 策略指標解析</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div class="card p-4 border-l-4 border-yellow-500 bg-[#1f2937]/50">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-bold text-yellow-500">箱子戰法 (Box Theory)</h3>
+                                    <i class="fa-solid fa-box-open text-yellow-500/50"></i>
+                                </div>
+                                <p class="text-xs text-gray-300 leading-relaxed">自動識別近期股價的高點與低點區間。股價在箱型內整理，突破箱頂視為強勢買訊，跌破箱底則為轉弱訊號。</p>
+                            </div>
+                            
+                            <div class="card p-4 border-l-4 border-red-500 bg-[#1f2937]/50">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-bold text-red-500">極光線 (Aurora Lines)</h3>
+                                    <i class="fa-solid fa-wave-square text-red-500/50"></i>
+                                </div>
+                                <p class="text-xs text-gray-300 leading-relaxed">由紅(短期)與綠(中期)兩組均線構成。紅線在綠線之上且發散為多頭極光；反之為空頭。均線糾結處常是變盤點。</p>
+                            </div>
+
+                            <div class="card p-4 border-l-4 border-blue-500 bg-[#1f2937]/50">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-bold text-blue-500">多方維持線</h3>
+                                    <i class="fa-solid fa-shield-halved text-blue-500/50"></i>
+                                </div>
+                                <p class="text-xs text-gray-300 leading-relaxed">基於過去 20 根 K 線的低點計算出的動態防守線。股價在線之上代表多方控盤，跌破則趨勢可能反轉。</p>
+                            </div>
+
+                            <div class="card p-4 border-l-4 border-teal-400 bg-[#1f2937]/50">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-bold text-teal-400">HMA 費式排列</h3>
+                                    <i class="fa-solid fa-arrow-up-right-dots text-teal-400/50"></i>
+                                </div>
+                                <p class="text-xs text-gray-300 leading-relaxed">使用赫爾移動平均線 (HMA) 結合費波南希數列 (5, 21, 34...)。HMA 反應靈敏，適合捕捉快速的趨勢轉折。</p>
+                            </div>
+
+                            <div class="card p-4 border-l-4 border-purple-400 bg-[#1f2937]/50">
+                                <div class="flex justify-between items-center mb-2">
+                                    <h3 class="font-bold text-purple-400">HMA 傳統排列</h3>
+                                    <i class="fa-solid fa-arrow-down-short-wide text-purple-400/50"></i>
+                                </div>
+                                <p class="text-xs text-gray-300 leading-relaxed">使用 HMA 計算傳統週期 (5, 10, 20, 60...)。比一般 SMA/EMA 更平滑且滯後更少，呈現清晰的長線趨勢。</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -768,4 +815,5 @@
 </script>
 </body>
 </html>
+
 
