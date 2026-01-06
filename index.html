@@ -3,11 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hの投資戰情中心</title>
+    <title>HのTrade 投資戰情中心</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/simple-statistics/7.8.0/simple-statistics.min.js"></script>
+    <!-- 引入 Chart.js 用於 ETF 趨勢圖 -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body { background-color: #0b0e11; color: #eaecef; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; }
@@ -34,6 +36,10 @@
         .filter-btn { font-size: 11px; padding: 4px 8px; border-radius: 4px; transition: all 0.2s; border: 1px solid transparent; }
         .tab-btn { padding: 8px 16px; border-bottom: 2px solid transparent; color: #848e9c; cursor: pointer; font-weight: bold; font-size: 0.9rem; }
         .tab-btn.active { border-color: #3b82f6; color: #3b82f6; }
+        .tag-pill { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: bold; margin-right: 4px; }
+        .tag-tech { background: rgba(59, 130, 246, 0.2); color: #60a5fa; }
+        .tag-chip { background: rgba(245, 158, 11, 0.2); color: #fbbf24; }
+        .tag-fund { background: rgba(16, 185, 129, 0.2); color: #34d399; }
         .toggle-checkbox:checked { right: 0; border-color: #ef5350; }
         .toggle-checkbox:checked + .toggle-label { background-color: #ef5350; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
@@ -44,13 +50,17 @@
         .text-up { color: #ef5350; }
         .text-down { color: #26a69a; }
         
-        /* New Config Panel Styles */
+        /* Config Panel Styles */
         .config-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); margin-bottom: 8px; transition: background 0.2s; }
         .config-item:hover { background: rgba(255,255,255,0.05); }
         .sortable-th { cursor: pointer; user-select: none; transition: background 0.2s; }
         .sortable-th:hover { background-color: #374151; }
         .sort-icon { margin-left: 4px; color: #6b7280; font-size: 0.8em; }
         .sort-icon.active { color: #f0b90b; }
+        
+        /* ETF Monitor Styles */
+        .etf-tab-active { background-color: #f0b90b; color: black; font-weight: bold; }
+        .etf-tab-inactive { background-color: #2b3139; color: #848e9c; }
         @media print {
             body { background-color: white; color: black; height: auto; overflow: visible; }
             #sidebar, .no-print, header, #addStockModal, .btn-primary, button { display: none !important; }
@@ -75,17 +85,18 @@
             <i class="fa-solid fa-layer-group text-yellow-500 text-2xl"></i>
             <div>
                 <h1 class="font-bold text-lg tracking-wider text-white">HのTrade</h1>
-                <p class="text-[10px] text-gray-500 uppercase tracking-widest">HのDashboard</p>
+                <p class="text-[10px] text-gray-500 uppercase tracking-widest">Pro Dashboard</p>
             </div>
         </div>
         <div class="flex-grow py-4 space-y-1">
             <div class="px-4 text-xs font-bold text-gray-500 mb-2 mt-2">主選單</div>
             <div class="nav-item active" onclick="switchView('dashboard', this)"><i class="fa-solid fa-chart-pie w-5"></i> 智能戰情室</div>
             <div class="nav-item" onclick="switchView('breadth', this)"><i class="fa-solid fa-chart-simple w-5"></i> 市場廣度</div>
-            <div class="nav-item" onclick="switchView('kline', this)"><i class="fa-solid fa-chart-line w-5"></i> 指標大師</div>
+            <div class="nav-item" onclick="switchView('kline', this)"><i class="fa-solid fa-chart-line w-5"></i> K線大師(指標版)</div>
             <div class="nav-item" onclick="switchView('encyclopedia', this)"><i class="fa-solid fa-book-open w-5"></i> 型態百科</div>
             <div class="nav-item" onclick="switchView('lohas', this)"><i class="fa-solid fa-lines-leaning w-5"></i> 樂活五線譜</div>
             <div class="nav-item" onclick="switchView('compare', this)"><i class="fa-solid fa-ranking-star w-5"></i> 績效超級比</div>
+            <div class="nav-item" onclick="switchView('etf', this)"><i class="fa-solid fa-chart-area w-5"></i> ETF 持股監控</div>
             <div class="nav-item" onclick="switchView('screener', this)"><i class="fa-solid fa-filter w-5"></i> 策略選股</div>
             <div class="nav-item" onclick="switchView('portfolio', this)"><i class="fa-solid fa-wallet w-5"></i> 庫存損益</div>
         </div>
@@ -142,11 +153,11 @@
             </div>
         </div>
 
-        <!-- View 2: 指標大師 -->
+        <!-- View 2: K線大師 (指標版 - 取代原版) -->
         <div id="view-kline" class="view-section hidden flex flex-col h-full p-2 md:p-4 space-y-3">
              <div class="card p-3 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-2xl shrink-0">
                 <div class="flex items-center gap-3">
-                    <h1 class="text-lg font-bold tracking-tight hidden md:block">指標大師 <span class="text-yellow-500 text-[10px] bg-yellow-500/10 px-2 py-0.5 rounded ml-2">PRO INDICATOR</span></h1>
+                    <h1 class="text-lg font-bold tracking-tight hidden md:block">K線大師 <span class="text-yellow-500 text-[10px] bg-yellow-500/10 px-2 py-0.5 rounded ml-2">PRO INDICATOR</span></h1>
                     <div class="flex gap-2 ml-0 md:ml-4">
                         <select id="marketType" class="bg-[#2b3139] text-white p-2 rounded-lg text-sm outline-none border border-gray-700 cursor-pointer"><option value="TW">台股上市</option><option value="TWO">台股上櫃</option><option value="US">美股</option></select>
                         <input type="text" id="stockInput" value="2330" placeholder="代碼" class="bg-[#2b3139] text-white p-2 rounded-lg w-24 text-sm outline-none uppercase font-mono border border-gray-700">
@@ -201,7 +212,7 @@
             </div>
         </div>
 
-                <!-- View: 型態百科 (Encyclopedia) -->
+        <!-- View: 型態百科 (Encyclopedia) -->
         <div id="view-encyclopedia" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
             <div class="card border-t-4 border-yellow-500">
                 <div class="p-6 border-b border-gray-800"><h2 class="text-xl font-bold mb-2 flex items-center gap-2"><i class="fa-solid fa-book-open text-yellow-500"></i> K線型態百科</h2><p class="text-sm text-gray-400">完整收錄 16 種經典 K 線型態定義與實戰含義。</p></div>
@@ -258,14 +269,68 @@
 
         <!-- View 5: 樂活五線譜 -->
         <div id="view-lohas" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
-            <!-- (保持原代碼不變) -->
             <div class="card border-t-4 border-orange-500 h-full flex flex-col"><div class="p-4 border-b border-gray-800 flex flex-wrap gap-4 items-center justify-between"><div class="flex items-center gap-3"><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-lines-leaning text-orange-500"></i> 樂活五線譜 + 布林通道</h2></div><div class="flex gap-2"><input type="text" id="lohasInput" value="2330.TW" class="input-dark uppercase font-mono w-32" placeholder="代碼"><button onclick="renderLohasView()" class="btn-primary text-sm">分析</button></div></div><div class="flex-grow p-4 relative"><div id="lohasLoader" class="hidden absolute inset-0 bg-[#0b1118]/90 z-50 flex-col justify-center items-center"><div class="spinner border-4 border-orange-500 rounded-full w-10 h-10 animate-spin mb-4"></div><div class="text-orange-500 text-sm font-bold">計算回歸趨勢中...</div></div><div id="lohasChart" class="w-full h-full"></div></div><div class="p-4 bg-[#161a1e] border-t border-gray-800 text-xs text-gray-400 grid grid-cols-2 md:grid-cols-5 gap-2 text-center"><div><span class="w-3 h-3 inline-block bg-purple-500 rounded-full mr-1"></span>樂觀線 (TL+2SD)</div><div><span class="w-3 h-3 inline-block bg-blue-400 rounded-full mr-1"></span>相對樂觀 (TL+1SD)</div><div><span class="w-3 h-3 inline-block bg-white rounded-full mr-1"></span>趨勢線 (TL)</div><div><span class="w-3 h-3 inline-block bg-blue-400 rounded-full mr-1"></span>相對悲觀 (TL-1SD)</div><div><span class="w-3 h-3 inline-block bg-green-500 rounded-full mr-1"></span>悲觀線 (TL-2SD)</div></div></div>
         </div>
 
         <!-- View 6: 績效超級比 -->
         <div id="view-compare" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
-            <!-- (保持原代碼不變) -->
             <div class="card border-t-4 border-blue-400 h-full flex flex-col"><div class="p-6 border-b border-gray-800"><h2 class="text-xl font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-ranking-star text-blue-400"></i> 績效超級比一比</h2><div class="flex flex-wrap items-end gap-4"><div class="flex-grow max-w-lg"><label class="block text-xs text-gray-500 mb-1">比較標的 (逗號分隔)</label><input type="text" id="compareInput" value="2330.TW, 0050.TW, 0056.TW, 2317.TW" class="input-dark w-full uppercase font-mono" placeholder="2330.TW, 0050.TW"></div><div class="flex items-center mb-1"><label for="adjToggle" class="flex items-center cursor-pointer relative"><input type="checkbox" id="adjToggle" class="sr-only" checked><div class="w-11 h-6 bg-gray-700 rounded-full border border-gray-600 toggle-bg transition"></div><span class="ml-3 text-sm font-bold text-gray-300" id="adjLabel">含息 (Total Return)</span><div class="w-5 h-5 bg-white rounded-full absolute left-0.5 top-0.5 transition transform" id="toggleDot" style="transform: translateX(100%);"></div></label></div><button onclick="renderPerformanceView()" class="btn-primary bg-blue-500 hover:bg-blue-400 text-white border-none"><i class="fa-solid fa-play mr-1"></i> 開始比較</button></div></div><div class="flex-grow p-6 overflow-auto"><div id="perfLoader" class="hidden flex flex-col justify-center items-center py-20"><div class="spinner border-4 border-blue-400 rounded-full w-10 h-10 animate-spin mb-4"></div><div class="text-blue-400 text-sm">正在抓取歷史數據與除權息資料...</div></div><table id="perfTable" class="w-full text-left text-sm whitespace-nowrap hidden"><thead class="bg-[#2b3139] text-gray-300"><tr><th class="p-3 rounded-l-lg sortable-th" onclick="sortPerf('symbol')">代碼 <i id="sort-symbol" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 sortable-th" onclick="sortPerf('name')">名稱 <i id="sort-name" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('price')">現價 <i id="sort-price" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_0')">近1日 <i id="sort-r_0" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_1')">近1週 <i id="sort-r_1" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_2')">近1月 <i id="sort-r_2" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_3')">近1季 <i id="sort-r_3" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_4')">近半年 <i id="sort-r_4" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right sortable-th" onclick="sortPerf('r_5')">近3年 <i id="sort-r_5" class="fa-solid fa-sort sort-icon"></i></th><th class="p-3 text-right rounded-r-lg sortable-th" onclick="sortPerf('r_6')">近5年 <i id="sort-r_6" class="fa-solid fa-sort sort-icon"></i></th></tr></thead><tbody id="perfBody" class="divide-y divide-gray-800 text-gray-300 font-mono"></tbody></table></div></div>
+        </div>
+
+        <!-- View 7: ETF Monitor (New!) -->
+        <div id="view-etf" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto">
+            <div class="card border-t-4 border-indigo-500 h-full flex flex-col">
+                <div class="p-4 border-b border-gray-800 flex justify-between items-center">
+                    <h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-chart-area text-indigo-500"></i> ETF 持股權重監控 (00981A)</h2>
+                    <a href="https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 underline">下載每日持股</a>
+                </div>
+                
+                <div class="p-4 border-b border-gray-800 flex bg-[#161a1e]">
+                    <button onclick="switchEtfTab('merger')" id="tab-etf-merger" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all mr-2 etf-tab-active">1. 資料匯整 (Merger)</button>
+                    <button onclick="switchEtfTab('viewer')" id="tab-etf-viewer" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all etf-tab-inactive">2. 趨勢圖表 (Viewer)</button>
+                </div>
+
+                <div class="p-6 overflow-y-auto custom-scrollbar flex-grow">
+                    <!-- Merger Section -->
+                    <div id="etf-merger" class="space-y-6">
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-400">1. 選擇每日報表來源檔 (可多選)</label>
+                            <input type="file" id="sourceFile" accept=".xlsx, .xls" multiple class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-900 file:text-blue-200 hover:file:bg-blue-800 cursor-pointer">
+                            <p class="text-xs text-gray-500">提示：按住 Ctrl 或 Shift 鍵可一次選擇多個檔案。</p>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="block text-sm font-medium text-gray-400">2. 選擇現有彙整檔 (monitor.xlsx) <span class="text-gray-500">[選填]</span></label>
+                            <input type="file" id="monitorFile" accept=".xlsx, .xls" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-900 file:text-amber-200 hover:file:bg-amber-800 cursor-pointer">
+                            <p class="text-xs text-gray-500">第一次使用請留空，系統將建立新檔。</p>
+                        </div>
+                        <button id="processBtn" onclick="processFiles()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-200 flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-file-export"></i> 開始處理並下載 monitor.xlsx
+                        </button>
+                    </div>
+
+                    <!-- Viewer Section -->
+                    <div id="etf-viewer" class="hidden space-y-6">
+                        <div class="p-4 bg-[#1f2937] rounded-xl border border-gray-700">
+                            <label class="block text-sm font-medium text-gray-300 mb-2">上傳 Monitor.xlsx 以檢視趨勢</label>
+                            <input type="file" id="viewerFile" accept=".xlsx, .xls" onchange="loadChartData()" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-900 file:text-indigo-200 hover:file:bg-indigo-800 cursor-pointer">
+                        </div>
+                        <div class="relative h-[400px] w-full bg-[#161a1e] border border-gray-700 rounded-xl p-2">
+                            <canvas id="trendChart"></canvas>
+                        </div>
+                        <div class="border border-gray-700 rounded-lg overflow-hidden bg-[#161a1e]">
+                            <div class="grid grid-cols-6 gap-2 p-3 bg-[#2b3139] font-bold text-xs text-gray-300 border-b border-gray-700">
+                                <div class="col-span-1">排名</div><div class="col-span-1">股票名稱</div><div class="col-span-4 text-right pr-4">權重趨勢 (近5日)</div>
+                            </div>
+                            <div id="dataTableBody" class="max-h-64 overflow-y-auto divide-y divide-gray-800 text-gray-400">
+                                <div class="p-8 text-center text-sm">請上傳檔案以顯示數據</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Logs -->
+                    <div id="statusArea" class="hidden mt-4 rounded-lg bg-[#0b0e11] p-4 border border-gray-800 text-xs font-mono text-green-400 space-y-1 max-h-40 overflow-y-auto"></div>
+                </div>
+            </div>
         </div>
 
         <!-- View 3: 策略選股 -->
@@ -295,7 +360,8 @@
     let activeView = 'dashboard';
     let lohasChartInstance = null;
     let breadthChartInstance = null;
-    let indicatorData = null; // Store calculated indicator data
+    let indicatorData = null; 
+    let chartInstanceETF = null; // Separate instance for ETF chart
 
     function switchView(viewId, btn) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
@@ -311,83 +377,11 @@
         if (viewId === 'lohas') renderLohasView(); 
         if (viewId === 'encyclopedia') renderEncyclopediaView();
         if (viewId === 'breadth') renderBreadthView();
+        // ETF view doesn't require init load until user interacts
         
         if (window.innerWidth < 768) toggleSidebar();
     }
     function toggleSidebar() { document.getElementById('sidebar').classList.toggle('open'); document.getElementById('mobileOverlay').classList.toggle('active'); }
-
-    // --- Math & Indicator Functions ---
-    const WMA = (data, period) => {
-        let result = new Array(data.length).fill(null);
-        if (data.length < period) return result;
-        let weightSum = (period * (period + 1)) / 2;
-        for (let i = period - 1; i < data.length; i++) {
-            let sum = 0, hasNull = false;
-            for (let j = 0; j < period; j++) {
-                if (data[i - j] === null) { hasNull = true; break; }
-                sum += data[i - j] * (period - j);
-            }
-            if (!hasNull) result[i] = sum / weightSum;
-        }
-        return result;
-    };
-    const HMA = (data, period) => {
-        let closePrices = data.map(d => d.y[3]);
-        if (closePrices.length < period) return new Array(data.length).fill(null);
-        let halfLen = Math.round(period * 0.5);
-        let sqrtLen = Math.round(Math.sqrt(period));
-        let wmaHalf = WMA(closePrices, halfLen);
-        let wmaFull = WMA(closePrices, period);
-        let diff = new Array(data.length).fill(null);
-        for (let i = 0; i < data.length; i++) {
-            if (wmaHalf[i] !== null && wmaFull[i] !== null) diff[i] = 2 * wmaHalf[i] - wmaFull[i];
-        }
-        return WMA(diff, sqrtLen);
-    };
-    const SMA = (data, period, key = 'close') => {
-        let result = new Array(data.length).fill(null);
-        for (let i = period - 1; i < data.length; i++) {
-            let sum = 0;
-            for (let j = 0; j < period; j++) {
-                const val = key === 'hlc3' ? (data[i-j].y[1] + data[i-j].y[2] + data[i-j].y[3])/3 : data[i-j].y[3];
-                sum += val;
-            }
-            result[i] = parseFloat((sum / period).toFixed(2));
-        }
-        return result;
-    };
-
-    function calculateIndicators(data) {
-        if (!data || data.length < 5) return null;
-        const auroraRed = [5,6,7,8,9,10].map(p => SMA(data, p, 'close'));
-        const auroraGreen = [11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28].map(p => SMA(data, p, 'hlc3'));
-        const hmaFib = [5, 21, 34, 55, 89, 144, 233].map(p => HMA(data, p));
-        const hmaTrad = [5, 10, 20, 60, 120, 240, 300, 360].map(p => HMA(data, p));
-
-        let boxTop = null, boxBottom = null, topIdx = Infinity, bottomIdx = Infinity;
-        for(let i=data.length-2; i>5; i--) {
-            const currentHigh = Math.max(data[i].y[0], data[i].y[3]);
-            const currentLow = Math.min(data[i].y[0], data[i].y[3]);
-            const isPH = currentHigh > Math.max(data[i-1].y[0], data[i-1].y[3]) && currentHigh > Math.max(data[i+1].y[0], data[i+1].y[3]);
-            const isPL = currentLow < Math.min(data[i-1].y[0], data[i-1].y[3]) && currentLow < Math.min(data[i+1].y[0], data[i+1].y[3]);
-            if(!boxTop && isPH) { boxTop = currentHigh; topIdx = i; }
-            if(!boxBottom && isPL) { boxBottom = currentLow; bottomIdx = i; }
-            if(boxTop && boxBottom) break;
-        }
-
-        let maintLine = new Array(data.length).fill(null);
-        let iLow = data[0].y[2], lastHighVal = 0, finalVal = null;
-        for(let i=0; i<data.length; i++) {
-            let p1Range = data.slice(Math.max(0, i-19), i+1);
-            let currentP1High = Math.max(...p1Range.map(d => d.y[1]));
-            if(currentP1High > lastHighVal) iLow = data[i].y[1];
-            else iLow = Math.min(iLow || data[i].y[2], data[i].y[2]);
-            lastHighVal = currentP1High;
-            if(Math.min(...p1Range.map(d => d.y[2])) === iLow) finalVal = iLow;
-            maintLine[i] = finalVal;
-        }
-        return { auroraRed, auroraGreen, hmaFib, hmaTrad, boxTop, boxBottom, commonStartIdx: Math.min(topIdx, bottomIdx), maintLine };
-    }
 
     // --- Core API ---
     async function getStockPrice(symbol) {
@@ -802,6 +796,248 @@
     async function renderPortfolio() { /* Mock Logic */ }
     async function updateLocalIndices() { /* Mock Logic */ }
 
+    // --- ETF Monitor Logic (New Integration) ---
+    const TARGET_RANGE = { s: { c: 0, r: 20 }, e: { c: 3, r: 71 } }; // A21:D72
+    const TARGET_SHEET_NAME = "基金投資組合";
+    const OUTPUT_FILENAME = "monitor.xlsx";
+
+    function log(message, type = 'info') {
+        const statusArea = document.getElementById('statusArea');
+        statusArea.classList.remove('hidden');
+        const div = document.createElement('div');
+        div.textContent = `> ${message}`;
+        if (type === 'error') div.className = 'text-red-500 font-bold';
+        if (type === 'success') div.className = 'text-green-500 font-bold';
+        statusArea.appendChild(div);
+        statusArea.scrollTop = statusArea.scrollHeight;
+    }
+
+    async function readExcelFile(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    resolve(workbook);
+                } catch (err) { reject(err); }
+            };
+            reader.onerror = reject;
+            reader.readAsArrayBuffer(file);
+        });
+    }
+
+    function extractDateFromFilename(filename) {
+        const match = filename.match(/(\d{8})/);
+        if (match) return match[1];
+        const today = new Date();
+        return today.toISOString().split('T')[0].replace(/-/g, '');
+    }
+
+    function switchEtfTab(tab) {
+        const mergerSec = document.getElementById('etf-merger');
+        const viewerSec = document.getElementById('etf-viewer');
+        const tabMerger = document.getElementById('tab-etf-merger');
+        const tabViewer = document.getElementById('tab-etf-viewer');
+
+        if (tab === 'merger') {
+            mergerSec.classList.remove('hidden'); viewerSec.classList.add('hidden');
+            tabMerger.classList.add('etf-tab-active', 'text-black', 'bg-yellow-500'); tabMerger.classList.remove('etf-tab-inactive', 'text-gray-400', 'bg-gray-700');
+            tabViewer.classList.add('etf-tab-inactive', 'text-gray-400', 'bg-gray-700'); tabViewer.classList.remove('etf-tab-active', 'text-black', 'bg-yellow-500');
+        } else {
+            mergerSec.classList.add('hidden'); viewerSec.classList.remove('hidden');
+            tabViewer.classList.add('etf-tab-active', 'text-black', 'bg-yellow-500'); tabViewer.classList.remove('etf-tab-inactive', 'text-gray-400', 'bg-gray-700');
+            tabMerger.classList.add('etf-tab-inactive', 'text-gray-400', 'bg-gray-700'); tabMerger.classList.remove('etf-tab-active', 'text-black', 'bg-yellow-500');
+        }
+        document.getElementById('statusArea').innerHTML = '';
+        document.getElementById('statusArea').classList.add('hidden');
+    }
+
+    async function processFiles() {
+        const sourceInput = document.getElementById('sourceFile');
+        const monitorInput = document.getElementById('monitorFile');
+        const btn = document.getElementById('processBtn');
+
+        document.getElementById('statusArea').innerHTML = '';
+        
+        if (!sourceInput.files.length) { alert('請先選擇「每日報表來源檔」！'); return; }
+
+        try {
+            btn.disabled = true; btn.textContent = '處理中...';
+            log('開始處理匯整...');
+
+            let monitorWorkbook;
+            let outputFilename = OUTPUT_FILENAME;
+
+            if (monitorInput.files.length > 0) {
+                outputFilename = monitorInput.files[0].name;
+                log(`讀取現有的彙整檔: ${outputFilename}...`);
+                monitorWorkbook = await readExcelFile(monitorInput.files[0]);
+            } else {
+                log(`建立新的彙整檔 (${outputFilename})...`);
+                monitorWorkbook = XLSX.utils.book_new();
+            }
+
+            const files = Array.from(sourceInput.files);
+            files.sort((a, b) => a.name.localeCompare(b.name));
+
+            let successCount = 0;
+            let failCount = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                log(`[${i + 1}/${files.length}] 正在分析: ${file.name}...`);
+                try {
+                    const sheetNameDate = extractDateFromFilename(file.name);
+                    const sourceWorkbook = await readExcelFile(file);
+                    
+                    let targetSheet = sourceWorkbook.Sheets[TARGET_SHEET_NAME];
+                    if (!targetSheet) targetSheet = sourceWorkbook.Sheets[sourceWorkbook.SheetNames[0]];
+
+                    const extractedData = XLSX.utils.sheet_to_json(targetSheet, { header: 1, range: TARGET_RANGE });
+                    
+                    if (extractedData.length === 0) {
+                        log(`   錯誤: 讀取無資料`, 'error'); failCount++; continue;
+                    }
+
+                    if (monitorWorkbook.SheetNames.includes(sheetNameDate)) {
+                        const idx = monitorWorkbook.SheetNames.indexOf(sheetNameDate);
+                        monitorWorkbook.SheetNames.splice(idx, 1);
+                        delete monitorWorkbook.Sheets[sheetNameDate];
+                    }
+                    const newSheet = XLSX.utils.aoa_to_sheet(extractedData);
+                    XLSX.utils.book_append_sheet(monitorWorkbook, newSheet, sheetNameDate);
+                    successCount++;
+                } catch (err) { log(`   處理失敗: ${err.message}`, 'error'); failCount++; }
+            }
+
+            log(`處理完成! 成功: ${successCount}, 失敗: ${failCount}`, successCount > 0 ? 'success' : 'error');
+
+            if (successCount > 0) {
+                XLSX.writeFile(monitorWorkbook, outputFilename);
+                log(`下載已啟動！`, 'success');
+            }
+        } catch (error) { log(`系統錯誤: ${error.message}`, 'error'); } finally {
+            btn.disabled = false; btn.innerHTML = '<i class="fa-solid fa-file-export"></i> 開始處理並下載 monitor.xlsx';
+        }
+    }
+
+    async function loadChartData() {
+        const fileInput = document.getElementById('viewerFile');
+        if (!fileInput.files.length) return;
+        document.getElementById('statusArea').innerHTML = '';
+
+        try {
+            const workbook = await readExcelFile(fileInput.files[0]);
+            let sheets = workbook.SheetNames.sort();
+            const latestSheet = workbook.Sheets[sheets[sheets.length - 1]];
+            const latestDataRaw = XLSX.utils.sheet_to_json(latestSheet, { header: 1 });
+            
+            let startIndex = 0;
+            if (latestDataRaw.length > 0 && typeof latestDataRaw[0][1] === 'string' && (latestDataRaw[0][1].includes('名稱') || latestDataRaw[0][1].includes('Name'))) startIndex = 1;
+
+            let targetStocks = [];
+            for (let i = startIndex; i < startIndex + 15; i++) {
+                if (!latestDataRaw[i]) break;
+                const name = latestDataRaw[i][1];
+                if (name) targetStocks.push(name);
+            }
+
+            const datasets = {};
+            targetStocks.forEach(stock => { datasets[stock] = []; });
+
+            sheets.forEach(sheetName => {
+                const sheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+                const map = {};
+                rows.forEach(row => {
+                    if (row.length > 3) {
+                        const n = row[1];
+                        let v = row[3];
+                        if (typeof v === 'string') v = parseFloat(v.replace('%', '').replace(',', ''));
+                        if (n && !isNaN(v)) map[n] = v;
+                    }
+                });
+                targetStocks.forEach(stock => { datasets[stock].push(map[stock] !== undefined ? map[stock] : null); });
+            });
+
+            drawEtfChart(sheets, targetStocks, datasets);
+            renderEtfTable(sheets, targetStocks, datasets);
+        } catch (err) {
+            console.error(err);
+            log(`解析錯誤: ${err.message}`, 'error');
+            alert("解析失敗，請確認檔案格式是否正確");
+        }
+    }
+
+    function drawEtfChart(labels, stockNames, dataMap) {
+        const ctx = document.getElementById('trendChart').getContext('2d');
+        if (chartInstanceETF) chartInstanceETF.destroy();
+
+        const colors = ['#ef4444', '#f97316', '#f59e0b', '#84cc16', '#10b981', '#06b6d4', '#0ea5e9', '#3b82f6', '#6366f1', '#8b5cf6', '#d946ef', '#f43f5e', '#881337', '#e2e8f0', '#94a3b8'];
+
+        const datasets = stockNames.map((stock, idx) => ({
+            label: stock,
+            data: dataMap[stock],
+            borderColor: colors[idx % colors.length],
+            backgroundColor: colors[idx % colors.length],
+            borderWidth: 2,
+            tension: 0.1,
+            pointRadius: 3,
+            spanGaps: true
+        }));
+
+        // Set Chart.js global defaults for dark mode
+        Chart.defaults.color = '#9ca3af';
+        Chart.defaults.borderColor = '#374151';
+
+        chartInstanceETF = new Chart(ctx, {
+            type: 'line',
+            data: { labels: labels, datasets: datasets },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 10, font: { size: 11 }, color: '#d1d5db' } },
+                    title: { display: true, text: '前 15 大持股權重歷史走勢 (%)', color: '#f3f4f6' }
+                },
+                scales: { 
+                    x: { ticks: { color: '#9ca3af' }, grid: { color: '#374151' } },
+                    y: { beginAtZero: false, title: { display: true, text: '權重 (%)', color: '#9ca3af' }, ticks: { color: '#9ca3af' }, grid: { color: '#374151' } } 
+                }
+            }
+        });
+    }
+
+    function renderEtfTable(dates, stocks, dataMap) {
+        const container = document.getElementById('dataTableBody');
+        container.innerHTML = '';
+
+        stocks.forEach((stock, idx) => {
+            const values = dataMap[stock];
+            const latestVal = values[values.length - 1];
+            
+            const row = document.createElement('div');
+            row.className = "grid grid-cols-6 gap-2 p-3 text-sm hover:bg-[#374151] items-center border-b border-gray-800 transition";
+            row.innerHTML = `
+                <div class="col-span-1 font-bold text-gray-500">#${idx + 1}</div>
+                <div class="col-span-1 font-medium text-gray-300 truncate" title="${stock}">${stock}</div>
+                <div class="col-span-4 flex items-center justify-end gap-4">
+                    <span class="font-bold text-indigo-400 text-lg">${latestVal !== null ? latestVal.toFixed(2) + '%' : '-'}</span>
+                    <div class="hidden md:flex gap-1">
+                        ${values.slice(-5).map(v => `
+                            <span class="text-xs px-1.5 py-0.5 rounded ${v > 0 ? 'bg-green-900/30 text-green-400' : 'bg-gray-800 text-gray-500'}">
+                                ${v !== null ? v.toFixed(1) : '-'}
+                            </span>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            container.appendChild(row);
+        });
+    }
+
     // Init Call
     initPortfolio();
     switchView('dashboard', document.querySelector('.nav-item'));
@@ -815,5 +1051,3 @@
 </script>
 </body>
 </html>
-
-
