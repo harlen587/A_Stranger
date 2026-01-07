@@ -14,7 +14,9 @@
     <style>
         body { background-color: #0b0e11; color: #eaecef; font-family: 'Inter', sans-serif; height: 100vh; overflow: hidden; display: flex; }
         #sidebar { width: 240px; background-color: #161a1e; border-right: 1px solid #2b2f3a; flex-shrink: 0; display: flex; flex-direction: column; transition: transform 0.3s; z-index: 50; }
-        #main-content { flex-grow: 1; overflow-y: auto; overflow-x: hidden; position: relative; background-color: #0b0e11; display: flex; flex-direction: column; }
+        /* 修正：主內容區改為 column 排列，隱藏自身捲軸，讓內部 view 捲動 */
+        #main-content { flex-grow: 1; height: 100%; position: relative; background-color: #0b0e11; display: flex; flex-direction: column; overflow: hidden; }
+        
         @media (max-width: 768px) {
             #sidebar { position: absolute; height: 100%; transform: translateX(-100%); }
             #sidebar.open { transform: translateX(0); }
@@ -42,15 +44,17 @@
         .tag-fund { background: rgba(16, 185, 129, 0.2); color: #34d399; }
         .toggle-checkbox:checked { right: 0; border-color: #ef5350; }
         .toggle-checkbox:checked + .toggle-label { background-color: #ef5350; }
+        
+        /* 捲軸樣式 */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-thumb { background: #2b3139; border-radius: 3px; }
         ::-webkit-scrollbar-track { background: transparent; }
+        
         .fade-in { animation: fadeIn 0.3s ease-in-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .text-up { color: #ef5350; }
         .text-down { color: #26a69a; }
         
-        /* Config Panel Styles */
         .config-item { display: flex; align-items: center; justify-content: space-between; padding: 10px; border-radius: 8px; background: rgba(255,255,255,0.03); margin-bottom: 8px; transition: background 0.2s; }
         .config-item:hover { background: rgba(255,255,255,0.05); }
         .sortable-th { cursor: pointer; user-select: none; transition: background 0.2s; }
@@ -58,9 +62,9 @@
         .sort-icon { margin-left: 4px; color: #6b7280; font-size: 0.8em; }
         .sort-icon.active { color: #f0b90b; }
         
-        /*  Monitor Styles */
-        .-tab-active { background-color: #f0b90b; color: black; font-weight: bold; }
-        .-tab-inactive { background-color: #2b3139; color: #848e9c; }
+        .etf-tab-active { background-color: #f0b90b; color: black; font-weight: bold; }
+        .etf-tab-inactive { background-color: #2b3139; color: #848e9c; }
+        
         @media print {
             body { background-color: white; color: black; height: auto; overflow: visible; }
             #sidebar, .no-print, header, #addStockModal, .btn-primary, button { display: none !important; }
@@ -73,6 +77,8 @@
             thead { background-color: #f3f4f6 !important; color: black !important; }
             .text-up { color: #d32f2f !important; }
             .text-down { color: #00796b !important; }
+            /* Hide footer warning in print */
+            footer { display: none; }
         }
     </style>
 </head>
@@ -114,8 +120,9 @@
         </div>
     </nav>
 
-    <main id="main-content" class="flex flex-col h-full relative">
-        <header class="md:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-[#161a1e]">
+    <!-- 主內容區：修正為 Column Flex 並包含 Footer -->
+    <main id="main-content">
+        <header class="md:hidden flex items-center justify-between p-4 border-b border-gray-800 bg-[#161a1e] flex-shrink-0">
             <button onclick="toggleSidebar()" class="text-gray-400"><i class="fa-solid fa-bars text-xl"></i></button>
             <span class="font-bold text-yellow-500">HのTrade</span>
             <div class="w-6"></div>
@@ -154,7 +161,7 @@
             </div>
         </div>
 
-        <!-- View 2: K線大師 (型態版) - RESTORED -->
+        <!-- View 2: K線大師 (型態版) -->
         <div id="view-kline" class="view-section hidden flex flex-col h-full p-2 md:p-4 space-y-3 flex-grow">
              <div class="card p-3 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-2xl shrink-0">
                 <div class="flex items-center gap-3">
@@ -173,7 +180,6 @@
             </div>
             
             <div id="chart-zone" class="grid grid-cols-1 lg:grid-cols-4 gap-3 flex-grow min-h-0">
-                <!-- 左側：型態偵測器 (Restored) -->
                 <div class="card p-4 rounded-xl flex flex-col space-y-3 border-t-4 border-yellow-500 shadow-xl overflow-hidden order-2 lg:order-1 h-full">
                     <div class="shrink-0 space-y-3">
                         <div class="flex justify-between items-center">
@@ -206,7 +212,7 @@
             </div>
         </div>
 
-        <!-- View: 技術指標 (Indicator - New Separate View) -->
+        <!-- View: 技術指標 (Indicator) -->
         <div id="view-indicator" class="view-section hidden flex flex-col h-full p-2 md:p-4 space-y-3 flex-grow">
              <div class="card p-3 rounded-xl flex flex-wrap gap-4 items-center justify-between shadow-2xl shrink-0">
                 <div class="flex items-center gap-3">
@@ -267,7 +273,7 @@
 
         <!-- View 7: ETF Monitor -->
         <div id="view-etf" class="view-section hidden p-4 md:p-8 space-y-6 fade-in h-full overflow-y-auto flex-grow">
-            <div class="card border-t-4 border-indigo-500 h-full flex flex-col"><div class="p-4 border-b border-gray-800 flex justify-between items-center"><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-chart-area text-indigo-500"></i> 00981A持股權重監控</h2><a href="https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 underline">下載每日持股</a></div><div class="p-4 border-b border-gray-800 flex bg-[#161a1e]"><button onclick="switchEtfTab('merger')" id="tab-etf-merger" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all mr-2 etf-tab-active">1. 資料匯整 (Merger)</button><button onclick="switchEtfTab('viewer')" id="tab-etf-viewer" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all etf-tab-inactive">2. 趨勢圖表 (Viewer)</button></div><div class="p-6 overflow-y-auto custom-scrollbar flex-grow"><div id="etf-merger" class="space-y-6"><div class="space-y-2"><label class="block text-sm font-medium text-gray-400">1. 選擇每日報表來源檔 (可多選)</label><input type="file" id="sourceFile" accept=".xlsx, .xls" multiple class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-900 file:text-blue-200 hover:file:bg-blue-800 cursor-pointer"></div><div class="space-y-2"><label class="block text-sm font-medium text-gray-400">2. 選擇現有彙整檔 (monitor.xlsx) <span class="text-gray-500">[選填]</span></label><input type="file" id="monitorFile" accept=".xlsx, .xls" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-900 file:text-amber-200 hover:file:bg-amber-800 cursor-pointer"></div><button id="processBtn" onclick="processFiles()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-200 flex items-center justify-center gap-2"><i class="fa-solid fa-file-export"></i> 開始處理並下載 monitor.xlsx</button></div><div id="etf-viewer" class="hidden space-y-6"><div class="p-4 bg-[#1f2937] rounded-xl border border-gray-700"><label class="block text-sm font-medium text-gray-300 mb-2">上傳 Monitor.xlsx 以檢視趨勢</label><input type="file" id="viewerFile" accept=".xlsx, .xls" onchange="loadChartData()" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-900 file:text-indigo-200 hover:file:bg-indigo-800 cursor-pointer"></div><div class="relative h-[400px] w-full bg-[#161a1e] border border-gray-700 rounded-xl p-2"><canvas id="trendChart"></canvas></div><div class="border border-gray-700 rounded-lg overflow-hidden bg-[#161a1e]"><div class="grid grid-cols-6 gap-2 p-3 bg-[#2b3139] font-bold text-xs text-gray-300 border-b border-gray-700"><div class="col-span-1">排名</div><div class="col-span-1">股票名稱</div><div class="col-span-4 text-right pr-4">權重趨勢 (近5日)</div></div><div id="dataTableBody" class="max-h-64 overflow-y-auto divide-y divide-gray-800 text-gray-400"><div class="p-8 text-center text-sm">請上傳檔案以顯示數據</div></div></div></div><div id="statusArea" class="hidden mt-4 rounded-lg bg-[#0b0e11] p-4 border border-gray-800 text-xs font-mono text-green-400 space-y-1 max-h-40 overflow-y-auto"></div></div></div>
+            <div class="card border-t-4 border-indigo-500 h-full flex flex-col"><div class="p-4 border-b border-gray-800 flex justify-between items-center"><h2 class="text-xl font-bold flex items-center gap-2"><i class="fa-solid fa-chart-area text-indigo-500"></i> 00981A持股權重監控 (00981A)</h2><a href="https://www.ezmoney.com.tw/ETF/Fund/Info?fundCode=49YTW" target="_blank" class="text-xs text-indigo-400 hover:text-indigo-300 underline">下載每日持股</a></div><div class="p-4 border-b border-gray-800 flex bg-[#161a1e]"><button onclick="switchEtfTab('merger')" id="tab-etf-merger" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all mr-2 etf-tab-active">1. 資料匯整 (Merger)</button><button onclick="switchEtfTab('viewer')" id="tab-etf-viewer" class="flex-1 py-2 px-4 rounded-lg font-bold text-sm transition-all etf-tab-inactive">2. 趨勢圖表 (Viewer)</button></div><div class="p-6 overflow-y-auto custom-scrollbar flex-grow"><div id="etf-merger" class="space-y-6"><div class="space-y-2"><label class="block text-sm font-medium text-gray-400">1. 選擇每日報表來源檔 (可多選)</label><input type="file" id="sourceFile" accept=".xlsx, .xls" multiple class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-900 file:text-blue-200 hover:file:bg-blue-800 cursor-pointer"></div><div class="space-y-2"><label class="block text-sm font-medium text-gray-400">2. 選擇現有彙整檔 (monitor.xlsx) <span class="text-gray-500">[選填]</span></label><input type="file" id="monitorFile" accept=".xlsx, .xls" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-amber-900 file:text-amber-200 hover:file:bg-amber-800 cursor-pointer"></div><button id="processBtn" onclick="processFiles()" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-3 px-4 rounded-xl shadow-md transition duration-200 flex items-center justify-center gap-2"><i class="fa-solid fa-file-export"></i> 開始處理並下載 monitor.xlsx</button></div><div id="etf-viewer" class="hidden space-y-6"><div class="p-4 bg-[#1f2937] rounded-xl border border-gray-700"><label class="block text-sm font-medium text-gray-300 mb-2">上傳 Monitor.xlsx 以檢視趨勢</label><input type="file" id="viewerFile" accept=".xlsx, .xls" onchange="loadChartData()" class="input-dark w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-900 file:text-indigo-200 hover:file:bg-indigo-800 cursor-pointer"></div><div class="relative h-[400px] w-full bg-[#161a1e] border border-gray-700 rounded-xl p-2"><canvas id="trendChart"></canvas></div><div class="border border-gray-700 rounded-lg overflow-hidden bg-[#161a1e]"><div class="grid grid-cols-6 gap-2 p-3 bg-[#2b3139] font-bold text-xs text-gray-300 border-b border-gray-700"><div class="col-span-1">排名</div><div class="col-span-1">股票名稱</div><div class="col-span-4 text-right pr-4">權重趨勢 (近5日)</div></div><div id="dataTableBody" class="max-h-64 overflow-y-auto divide-y divide-gray-800 text-gray-400"><div class="p-8 text-center text-sm">請上傳檔案以顯示數據</div></div></div></div><div id="statusArea" class="hidden mt-4 rounded-lg bg-[#0b0e11] p-4 border border-gray-800 text-xs font-mono text-green-400 space-y-1 max-h-40 overflow-y-auto"></div></div></div>
         </div>
 
         <!-- View 3: 策略選股 -->
@@ -283,10 +289,10 @@
         </div>
     </main>
 
-    <!-- Footer with Warnings -->
-    <footer class="bg-[#111] border-t border-gray-800 text-gray-500 py-3 text-xs text-center shrink-0">
+    <!-- Footer with Warnings (Inside Main Content) -->
+    <footer class="bg-[#111] border-t border-gray-800 text-gray-500 py-3 text-xs text-center shrink-0 w-full mt-auto">
         <div class="container mx-auto px-4">
-            <p class="mb-1">&copy; 2024 HのTrade. All rights reserved.</p>
+            <p class="mb-1">&copy; 2025 HのTrade. All rights reserved.</p>
             <p id="daily-warning" class="text-yellow-600 font-bold animate-pulse">...</p>
         </div>
     </footer>
@@ -974,7 +980,7 @@
 
     function setupWarnings() {
         // Use date string as seed for daily rotation
-        const today = new Date().toISOString().split('T')[0]; // "2024-05-20"
+        const today = new Date().toISOString().split('T')[0]; // "2025-01-07"
         
         // Simple hash function for consistent daily index
         let hash = 0;
@@ -1029,4 +1035,3 @@
 </script>
 </body>
 </html>
-
